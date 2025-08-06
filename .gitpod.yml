@@ -1,26 +1,24 @@
-      
-# Configuration Gitpod Finale et Correcte
+# Configuration Gitpod - Version Réparée et Simplifiée
 
 # Spécifie une image Docker complète qui inclut plus d'outils par défaut
 image: gitpod/workspace-full
 
 tasks:
-  - name: "Préparation de l'Environnement"
-    # La tâche 'before' s'exécute AVANT que l'IDE et les serveurs de langage ne démarrent
-    before: |
-      echo "--- TÂCHE 'BEFORE' : Configuration de Java 17 ---"
+  - name: Setup & Build
+    init: |
+      # --- Installer les outils nécessaires ---
+      sudo apt-get update && sudo apt-get install -y dos2unix
+      
+      # --- Installer et configurer Java 17 ---
+      echo "Installation de Java 17..."
       sdk install java 17.0.10-zulu
       sdk default java 17.0.10-zulu
       source "/home/gitpod/.sdkman/bin/sdkman-init.sh"
-      echo "--- Java 17 est maintenant la version par défaut pour tout le workspace ---"
-
-  - name: "Installation et Compilation"
-    # La tâche 'init' s'exécute après 'before' pour préparer les dépendances
-    init: |
-      echo "--- TÂCHE 'INIT' : Installation du SDK Android ---"
-      sudo apt-get update && sudo apt-get install -y dos2unix
+      echo "--- Java 17 est maintenant la version par défaut ---"
       
-      wget -q https://dl.google.com/android/repository/commandlinetetools-linux-9477386_latest.zip -O commandlinetools.zip
+      # --- Installer le SDK Android ---
+      echo "Installation du SDK Android..."
+      wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O commandlinetools.zip
       mkdir -p android-sdk/cmdline-tools
       unzip -q commandlinetools.zip -d android-sdk/cmdline-tools
       mv android-sdk/cmdline-tools/cmdline-tools android-sdk/cmdline-tools/latest
@@ -32,16 +30,17 @@ tasks:
       yes | sdkmanager --licenses >/dev/null
       sdkmanager "platforms;android-33" "build-tools;33.0.1" "platform-tools" >/dev/null
       
-      echo "--- Préparation des scripts Gradle ---"
+      echo "--- Préparation des scripts ---"
       dos2unix gradlew
       chmod +x ./gradlew
 
-    # La tâche 'command' s'exécute à la fin pour lancer la compilation
     command: |
-      echo "--- TÂCHE 'COMMAND' : Lancement de la compilation ---"
-      ./gradlew assembleDebug --no-daemon
+      # --- Lancer la compilation dans le bon environnement ---
+      echo "Configuration de l'environnement de compilation..."
+      export JAVA_HOME="/home/gitpod/.sdkman/candidates/java/17.0.10-zulu"
+      
+      echo "Lancement de la compilation..."
+      ./gradlew assembleDebug
       
       echo "--- COMPILATION TERMINÉE ! ---"
       echo "L'APK se trouve dans le dossier : app/build/outputs/apk/debug/"
-
-    
