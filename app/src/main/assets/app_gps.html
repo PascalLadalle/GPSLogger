@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>GPSLogger</title>
     
-    <!-- Charge la feuille de style de Leaflet depuis le dossier local de l'application -->
     <link rel="stylesheet" href="./leaflet.css" />
 
     <style>
@@ -86,9 +85,10 @@
             
             // --- SECTION 1 : INITIALISATION ---
 
+            // MODIFIÉ : Ajout de maxZoom pour autoriser un zoom numérique (flou) jusqu'au niveau 21
             const map = L.map('map', { 
                 zoomControl: false,
-                maxZoom: 21 // Autorise un zoom numérique jusqu'au niveau 21
+                maxZoom: 21
             });
 
             let directionMarker, accuracyCircle, isRecording = false;
@@ -97,10 +97,11 @@
 
             const imageBounds = [[8.466, -71.678], [8.485, -71.651]];
             
+            // MODIFIÉ : Ajout de maxNativeZoom pour indiquer à Leaflet d'arrêter de demander des tuiles après le niveau 19
             let onlineTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
                 attribution: 'Esri', 
                 className: 'map-layer-online',
-                maxNativeZoom: 19 // Le serveur ne fournit des tuiles que jusqu'à ce niveau
+                maxNativeZoom: 19 // Le serveur fournit des tuiles réelles jusqu'à ce niveau
             });
             let offlineImageLayer = L.imageOverlay('map_background.jpg', imageBounds, { className: 'map-layer-offline' });
             
