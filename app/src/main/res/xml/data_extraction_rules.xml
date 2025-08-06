@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Définir ici les données à inclure/exclure des sauvegardes cloud -->
+    </cloud-backup>
+    <device-transfer>
+        <!-- Définir ici les données à inclure/exclure des transferts d'appareil -->
+    </device-transfer>
+</data-extraction-rules>
