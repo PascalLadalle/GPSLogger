@@ -11,7 +11,7 @@ tasks:
       
       # --- Installer et configurer Java 17 ---
       echo "Installation de Java 17..."
-      sdk install java 17.0.10-zulu
+      yes | sdk install java 17.0.10-zulu
       sdk default java 17.0.10-zulu
       source "/home/gitpod/.sdkman/bin/sdkman-init.sh"
       echo "--- Java 17 est maintenant la version par défaut ---"
@@ -43,4 +43,5 @@ tasks:
       ./gradlew assembleDebug
       
       echo "--- COMPILATION TERMINÉE ! ---"
+
       echo "L'APK se trouve dans le dossier : app/build/outputs/apk/debug/"
