@@ -96,7 +96,6 @@
 
             const imageBounds = [[8.466, -71.678], [8.485, -71.651]];
             
-            // MODIFIÉ : maxNativeZoom est maintenant à 18
             let onlineTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
                 attribution: 'Esri', 
                 className: 'map-layer-online',
@@ -271,7 +270,6 @@
                 }
             });
 
-            // --- FONCTION DE SAUVEGARDE CORRIGÉE ---
             function saveData() {
                 const savableItems = recordedItems.map(item => {
                     const data = { id: item.id, name: item.name, type: item.type, coords: null };
@@ -285,7 +283,6 @@
                 localStorage.setItem('geoTrackerData', JSON.stringify(savableItems));
             }
             
-            // --- FONCTION DE CHARGEMENT CORRIGÉE ---
             function loadData() {
                 const savedData = localStorage.getItem('geoTrackerData');
                 if (!savedData) return;
@@ -322,7 +319,51 @@
             
             function showNotification(message, type = 'success') { const notif = document.createElement('div'); notif.className = `toast-notification ${type}`; notif.textContent = message; notificationContainer.appendChild(notif); requestAnimationFrame(() => notif.classList.add('show')); setTimeout(() => { notif.classList.remove('show'); notif.addEventListener('transitionend', () => notif.remove(), { once: true }); }, 3500); }
             
-            function updateItemList() { itemList.innerHTML = ''; recordedItems.forEach(item => { const li = document.createElement('li'); const nameSpan = document.createElement('span'); nameSpan.className = 'item-name'; nameSpan.textContent = item.name; const actionsDiv = document.createElement('div'); actionsDiv.className = 'item-actions'; const renameBtn = document.createElement('button'); renameBtn.textContent = '✏️'; renameBtn.className = 'rename-btn'; renameBtn.title = 'Renombrar'; renameBtn.onclick = function() { const newName = prompt('Introduce el nuevo nombre:', item.name); if (newName && newName.trim()) { item.name = newName.trim(); if (item.layer.getPopup()) item.layer.setPopupContent(item.name); else item.layer.bindPopup(item.name); updateItemList(); saveData(); showNotification('Elemento renombrado.'); } }; const deleteBtn = document.createElement('button'); deleteBtn.textContent = '🗑️'; deleteBtn.className = 'delete-btn'; deleteBtn.title = 'Borrar'; deleteBtn.onclick = function() { map.removeLayer(item.layer); recordedItems = recordedItems.filter(i => i.id !== item.id); updateItemList(); saveData(); showNotification(`'${item.name}' ha sido borrado.`); }; actionsDiv.appendChild(renameBtn); actionsDiv.appendChild(deleteBtn); li.appendChild(nameSpan); li.appendChild(actionsDiv); itemList.appendChild(li); }); }
+            function updateItemList() {
+                itemList.innerHTML = '';
+                recordedItems.forEach(item => {
+                    const li = document.createElement('li');
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'item-name';
+                    nameSpan.textContent = item.name;
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'item-actions';
+                    const renameBtn = document.createElement('button');
+                    renameBtn.textContent = '✏️';
+                    renameBtn.className = 'rename-btn';
+                    renameBtn.title = 'Renombrar';
+                    renameBtn.onclick = function() {
+                        const newName = prompt('Introduce el nuevo nombre:', item.name);
+                        if (newName && newName.trim()) {
+                            item.name = newName.trim();
+                            if (item.layer.getPopup()) {
+                                item.layer.setPopupContent(item.name);
+                            } else {
+                                item.layer.bindPopup(item.name);
+                            }
+                            updateItemList();
+                            saveData();
+                            showNotification('Elemento renombrado.');
+                        }
+                    };
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.textContent = '🗑️';
+                    deleteBtn.className = 'delete-btn';
+                    deleteBtn.title = 'Borrar';
+                    deleteBtn.onclick = function() {
+                        map.removeLayer(item.layer);
+                        recordedItems = recordedItems.filter(i => i.id !== item.id);
+                        updateItemList();
+                        saveData();
+                        showNotification(`'${item.name}' ha sido borrado.`);
+                    };
+                    actionsDiv.appendChild(renameBtn);
+                    actionsDiv.appendChild(deleteBtn);
+                    li.appendChild(nameSpan);
+                    li.appendChild(actionsDiv);
+                    itemList.appendChild(li);
+                });
+            }
             
             function openMenu() { menu.classList.add('open'); mapOverlay.classList.add('visible'); }
             function closeMenu() { menu.classList.remove('open'); mapOverlay.classList.remove('visible'); }
