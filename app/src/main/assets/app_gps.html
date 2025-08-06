@@ -3,21 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>GPS Logger</title>
+    <title>Geo Tracker</title>
     
     <link rel="stylesheet" href="./leaflet.css" />
 
     <style>
+        /* --- Structure Générale --- */
         body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         #map { height: 100%; width: 100%; z-index: 1; background-color: #e0e0e0; }
+
+        /* --- Superposition pour le menu --- */
         #map-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 999; display: none; opacity: 0; transition: opacity 0.3s ease; }
         #map-overlay.visible { display: block; opacity: 1; }
+
+        /* --- Notifications (Toasts) --- */
         #notification-container { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1001; pointer-events: none; width: 90%; max-width: 500px; }
         .toast-notification { padding: 12px 25px; border-radius: 25px; color: white; background-color: rgba(0, 0, 0, 0.75); box-shadow: 0 4px 12px rgba(0,0,0,0.2); margin-bottom: 10px; opacity: 0; transform: translateY(-30px); transition: opacity 0.4s ease, transform 0.4s ease; text-align: center; }
         .toast-notification.show { opacity: 1; transform: translateY(0); }
         .toast-notification.error { background-color: #dc3545; }
+
+        /* --- Contrôles sur la Carte --- */
         #controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2; display: flex; gap: 10px; }
         #controls button { padding: 15px 20px; font-size: 16px; border-radius: 50px; border: 2px solid #fff; background-color: #007BFF; color: white; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        
+        /* --- Menu Latéral --- */
         #menu-toggle { position: absolute; top: 20px; right: 20px; z-index: 1000; padding: 10px 15px; font-size: 24px; border-radius: 50%; border: 2px solid #ccc; background-color: white; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
         #menu { position: fixed; top: 0; left: -300px; width: 280px; height: 100%; background-color: white; z-index: 1001; transition: left 0.3s ease-in-out; display: flex; flex-direction: column; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }
         #menu.open { left: 0; }
@@ -35,6 +44,8 @@
         .delete-btn { background-color: #dc3545; }
         #menu-footer { padding: 20px; border-top: 1px solid #ddd; background-color: #f8f9fa; }
         #delete-all { width: 100%; padding: 15px; background-color: #dc3545; color: white; border: none; cursor: pointer; font-size: 16px; margin-top: 15px; }
+        
+        /* --- Icônes et Toggles --- */
         .direction-arrow { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 25px solid #007BFF; transition: transform 0.2s linear; transform-origin: center 15px; }
         .direction-accuracy { background-color: rgba(0, 123, 255, 0.1); border-radius: 50%; border: 1px solid #007BFF; }
         .toggle-container { display: flex; align-items: center; justify-content: space-around; font-size: 14px;}
@@ -67,18 +78,24 @@
     </div>
 
     <script src="./leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-geometryutil"></script>
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            
+            // --- SECTION 1 : INITIALISATION ---
+
             const map = L.map('map', { zoomControl: false });
             let directionMarker, accuracyCircle, isRecording = false;
             let currentTrack;
             let recordedItems = [], itemIdCounter = 0;
 
+            // Constante pour la simplification. Augmentez pour plus de simplification (moins de points),
+            // diminuez pour plus de détails (plus de points).
+            const simplificationTolerance = 5; 
+
             const imageBounds = [[8.466, -71.678], [8.485, -71.651]];
             let onlineTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri', className: 'map-layer-online' });
-            
-            // --- MODIFICATION : Utilisation de .jpg pour le fond de carte ---
             let offlineImageLayer = L.imageOverlay('map_background.jpg', imageBounds, { className: 'map-layer-offline' });
             
             const mapToggle = document.getElementById('map-toggle');
@@ -93,6 +110,7 @@
             const deleteAllBtn = document.getElementById('delete-all');
             const notificationContainer = document.getElementById('notification-container');
 
+            // Corrige les icônes manquantes en mode local
             delete L.Icon.Default.prototype._getIconUrl;
             L.Icon.Default.mergeOptions({
                 iconUrl: './images/marker-icon.png',
@@ -100,6 +118,10 @@
                 shadowUrl: './images/marker-shadow.png'
             });
 
+
+            // --- SECTION 2 : "PONT" NATIF <-> WEB ---
+
+            // Appelée par Android à chaque nouvelle position GPS
             window.updatePositionFromNative = function(lat, lng, accuracy) {
                 const newLatLng = L.latLng(lat, lng);
                 if (!directionMarker) {
@@ -119,21 +141,24 @@
                 }
             };
 
+            // Appelée par Android à chaque changement d'orientation
             window.updateHeadingFromNative = function(heading) {
                 if (directionMarker && directionMarker.getElement()) {
                     directionMarker.getElement().style.transform = `rotate(${heading}deg)`;
                 }
             };
 
+
+            // --- SECTION 3 : GESTION DES MODES DE CARTE ---
+
+            // Gère le passage entre la carte en ligne et l'image hors ligne
             function setMapMode(isOnline) {
-                map.eachLayer(function(layer) {
-                    if (layer instanceof L.ImageOverlay || layer instanceof L.TileLayer) {
-                        map.removeLayer(layer);
-                    }
+                map.eachLayer(layer => {
+                    if (layer instanceof L.ImageOverlay || layer instanceof L.TileLayer) map.removeLayer(layer);
                 });
                 if (isOnline) {
                     onlineTileLayer.addTo(map);
-                    if (!map.zoomControl) { map.zoomControl = L.control.zoom({position: 'topleft'}).addTo(map); }
+                    if (!map.zoomControl) map.zoomControl = L.control.zoom({position: 'topleft'}).addTo(map);
                 } else {
                     offlineImageLayer.addTo(map);
                     map.fitBounds(imageBounds);
@@ -142,48 +167,73 @@
                 localStorage.setItem('mapMode', isOnline ? 'online' : 'offline');
                 mapToggle.checked = isOnline;
             }
+
+            // Attache la fonction au clic sur le bouton toggle
             mapToggle.addEventListener('change', function() { setMapMode(this.checked); });
             
-            function saveData() { const savableItems = recordedItems.map(item => { const data = { id: item.id, name: item.name, type: item.type }; let coords; if (item.layer.getLatLngs) coords = item.layer.getLatLngs(); else coords = item.layer.getLatLng(); data.coords = coords; return data; }); localStorage.setItem('geoTrackerData', JSON.stringify(savableItems)); }
-            function loadData() { const savedData = localStorage.getItem('geoTrackerData'); if (!savedData) return; try { const parsedItems = JSON.parse(savedData); let maxId = 0; parsedItems.forEach(savedItem => { let layer; if (savedItem.type === 'point') { layer = L.marker(savedItem.coords).addTo(map).bindPopup(savedItem.name); } else { const points = savedItem.coords; if (points.length > 2 && L.latLng(points[0]).equals(L.latLng(points[points.length-1]))) { layer = L.polygon(points, {color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2}).addTo(map); } else { layer = L.polyline(points, { color: 'red', weight: 4 }).addTo(map); } } recordedItems.push({ id: savedItem.id, name: savedItem.name, type: savedItem.type, layer: layer }); const idNum = parseInt(savedItem.id.split('-')[1]); if (idNum > maxId) maxId = idNum; }); itemIdCounter = maxId; updateItemList(); } catch (e) { console.error("Error loading local data:", e); localStorage.removeItem('geoTrackerData'); } }
-            function showNotification(message, type = 'success') { const notif = document.createElement('div'); notif.className = `toast-notification ${type}`; notif.textContent = message; notificationContainer.appendChild(notif); requestAnimationFrame(() => notif.classList.add('show')); setTimeout(() => { notif.classList.remove('show'); notif.addEventListener('transitionend', () => notif.remove(), { once: true }); }, 3500); }
-            
+
+            // --- SECTION 4 : LOGIQUE D'ENREGISTREMENT ET DE CONTRÔLE ---
+
+            // Gère le clic sur le bouton d'enregistrement
             toggleRecordBtn.addEventListener('click', function() {
                 isRecording = !isRecording;
                 this.textContent = isRecording ? 'Detener Grabación' : 'Iniciar Grabación';
                 this.style.backgroundColor = isRecording ? '#dc3545' : '#007BFF';
+
                 if (isRecording) {
+                    // Si on démarre l'enregistrement
                     if (directionMarker) { map.flyTo(directionMarker.getLatLng(), 18); }
                     startNewTrack();
                     showNotification('Grabación iniciada.');
                 } else {
+                    // Si on arrête l'enregistrement
                     const trackToFinalize = currentTrack;
                     currentTrack = null; 
+                    
                     if (trackToFinalize && trackToFinalize.getLatLngs().length > 2) {
-                        const points = trackToFinalize.getLatLngs();
+                        let points = trackToFinalize.getLatLngs();
+                        
+                        // --- SIMPLIFICATION DU TRACÉ ---
+                        const simplifiedPoints = L.LineUtil.simplify(points, simplificationTolerance);
+                        trackToFinalize.setLatLngs(simplifiedPoints);
+                        
+                        // On re-récupère les points simplifiés pour la logique de fermeture
+                        points = trackToFinalize.getLatLngs();
                         const firstPoint = points[0];
                         const lastPoint = points[points.length - 1];
+                        
+                        // Si le parcours se termine près de son point de départ, on le ferme
                         if (firstPoint.distanceTo(lastPoint) < 5) {
                             points.push(firstPoint);
                             trackToFinalize.setLatLngs(points);
+                            // On remplace la ligne par un polygone visuel
                             const polygon = L.polygon(points, {color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2}).addTo(map);
                             const oldTrackItem = recordedItems.find(item => item.layer === trackToFinalize);
                             if(oldTrackItem) oldTrackItem.layer = polygon;
                             map.removeLayer(trackToFinalize);
                         }
-                        showNotification('Recorrido finalizado y guardado.');
+                        showNotification('Recorrido finalizado y simplificado.');
                     } else if (trackToFinalize) {
+                        // Si le parcours est trop court, on le supprime
                         const itemToRemove = recordedItems.pop();
                         if (itemToRemove) map.removeLayer(itemToRemove.layer);
                         updateItemList();
                         showNotification('Grabación detenida. Recorrido demasiado corto.', 'error');
                     }
-                    saveData();
+                    saveData(); // On sauvegarde dans tous les cas
                 }
             });
 
-            function startNewTrack() { const id = `track-${++itemIdCounter}`; const trackName = `Recorrido ${itemIdCounter}`; currentTrack = L.polyline([], { color: 'red', weight: 4 }).addTo(map); recordedItems.push({ id, name: trackName, type: 'track', layer: currentTrack }); updateItemList(); }
+            // Crée un nouveau tracé vide
+            function startNewTrack() {
+                const id = `track-${++itemIdCounter}`;
+                const trackName = `Recorrido ${itemIdCounter}`;
+                currentTrack = L.polyline([], { color: 'red', weight: 4 }).addTo(map);
+                recordedItems.push({ id, name: trackName, type: 'track', layer: currentTrack });
+                updateItemList();
+            }
             
+            // Gère le clic sur le bouton de création de point
             addPointBtn.addEventListener('click', function() {
                 if (!directionMarker) return showNotification('Posición no encontrada.', 'error');
                 map.flyTo(directionMarker.getLatLng(), 18);
@@ -197,16 +247,32 @@
                 showNotification(`Nuevo punto creado: ${pointName}`);
             });
 
+            
+            // --- SECTION 5 : GESTION DES DONNÉES ET DE L'INTERFACE ---
+
+            // Sauvegarde la liste des points et parcours dans le stockage local du navigateur
+            function saveData() { const savableItems = recordedItems.map(item => { const data = { id: item.id, name: item.name, type: item.type }; let coords; if (item.layer.getLatLngs) coords = item.layer.getLatLngs(); else coords = item.layer.getLatLng(); data.coords = coords; return data; }); localStorage.setItem('geoTrackerData', JSON.stringify(savableItems)); }
+            
+            // Charge les données depuis le stockage local
+            function loadData() { const savedData = localStorage.getItem('geoTrackerData'); if (!savedData) return; try { const parsedItems = JSON.parse(savedData); let maxId = 0; parsedItems.forEach(savedItem => { let layer; if (savedItem.type === 'point') { layer = L.marker(savedItem.coords).addTo(map).bindPopup(savedItem.name); } else { const points = savedItem.coords; if (points.length > 2 && L.latLng(points[0]).equals(L.latLng(points[points.length-1]))) { layer = L.polygon(points, {color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2}).addTo(map); } else { layer = L.polyline(points, { color: 'red', weight: 4 }).addTo(map); } } recordedItems.push({ id: savedItem.id, name: savedItem.name, type: savedItem.type, layer: layer }); const idNum = parseInt(savedItem.id.split('-')[1]); if (idNum > maxId) maxId = idNum; }); itemIdCounter = maxId; updateItemList(); } catch (e) { console.error("Error loading local data:", e); localStorage.removeItem('geoTrackerData'); } }
+            
+            // Affiche une notification (toast) à l'écran
+            function showNotification(message, type = 'success') { const notif = document.createElement('div'); notif.className = `toast-notification ${type}`; notif.textContent = message; notificationContainer.appendChild(notif); requestAnimationFrame(() => notif.classList.add('show')); setTimeout(() => { notif.classList.remove('show'); notif.addEventListener('transitionend', () => notif.remove(), { once: true }); }, 3500); }
+            
+            // Gère le clic sur le bouton "Tout Supprimer"
             deleteAllBtn.addEventListener('click', function() { if (recordedItems.length === 0) return showNotification('No hay nada que borrar.', 'error'); if (confirm('¿Estás seguro de que quieres borrar todos los elementos?')) { recordedItems.forEach(item => { if (item.layer) map.removeLayer(item.layer); }); recordedItems = []; itemIdCounter = 0; updateItemList(); saveData(); showNotification('Todos los elementos han sido borrados.'); } });
             
+            // Met à jour la liste des éléments dans le menu latéral
             function updateItemList() { itemList.innerHTML = ''; recordedItems.forEach(item => { const li = document.createElement('li'); const nameSpan = document.createElement('span'); nameSpan.className = 'item-name'; nameSpan.textContent = item.name; const actionsDiv = document.createElement('div'); actionsDiv.className = 'item-actions'; const renameBtn = document.createElement('button'); renameBtn.textContent = '✏️'; renameBtn.className = 'rename-btn'; renameBtn.title = 'Renombrar'; renameBtn.onclick = function() { const newName = prompt('Introduce el nuevo nombre:', item.name); if (newName && newName.trim()) { item.name = newName.trim(); if (item.layer.getPopup()) item.layer.setPopupContent(item.name); else item.layer.bindPopup(item.name); updateItemList(); saveData(); showNotification('Elemento renombrado.'); } }; const deleteBtn = document.createElement('button'); deleteBtn.textContent = '🗑️'; deleteBtn.className = 'delete-btn'; deleteBtn.title = 'Borrar'; deleteBtn.onclick = function() { map.removeLayer(item.layer); recordedItems = recordedItems.filter(i => i.id !== item.id); updateItemList(); saveData(); showNotification(`'${item.name}' ha sido borrado.`); }; actionsDiv.appendChild(renameBtn); actionsDiv.appendChild(deleteBtn); li.appendChild(nameSpan); li.appendChild(actionsDiv); itemList.appendChild(li); }); }
             
+            // Fonctions pour ouvrir et fermer le menu
             function openMenu() { menu.classList.add('open'); mapOverlay.classList.add('visible'); }
             function closeMenu() { menu.classList.remove('open'); mapOverlay.classList.remove('visible'); }
             menuCloseBtn.addEventListener('click', closeMenu);
             menuToggleBtn.addEventListener('click', (e) => { e.stopPropagation(); openMenu(); });
             mapOverlay.addEventListener('click', closeMenu);
 
+            // Gère le clic sur le bouton d'export
             exportShareBtn.addEventListener('click', function() {
                 if (recordedItems.length === 0) return showNotification('No hay elementos para exportar.', 'error');
                 showNotification('Generando archivo KML...');
@@ -219,6 +285,7 @@
                 }
             });
 
+            // Génère le contenu du fichier KML selon le format spécifié
             function generateKML() {
                 let kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n    <name>Datos del mapa interactivo</name>\n    <description>Exportado desde la aplicación web</description>\n`;
                 recordedItems.forEach(item => {
@@ -253,6 +320,7 @@
                 return kml;
             }
             
+            // --- DÉMARRAGE DE L'APPLICATION ---
             const savedMode = localStorage.getItem('mapMode');
             setMapMode(savedMode === 'online');
             loadData();
