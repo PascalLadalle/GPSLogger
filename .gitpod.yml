@@ -1,4 +1,4 @@
-# Configuration Gitpod pour Android - Version la plus robuste
+# Configuration Gitpod pour Android - Version Simplifiée et Corrigée
 
 tasks:
   - name: Setup & Build
@@ -10,15 +10,17 @@ tasks:
       source "/home/gitpod/.sdkman/bin/sdkman-init.sh"
       echo "--- Java 17 est maintenant la version par défaut ---"
       
-      # --- ÉTAPE 2: Installer le SDK Android ---
+      # --- ÉTAPE 2: Installer le SDK Android (Logique Corrigée) ---
       echo "Téléchargement des outils Android..."
       wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O commandlinetools.zip
-      unzip -q commandlinetools.zip -d ./android-sdk
+      
+      # Créer la structure de dossiers AVANT de décompresser
+      mkdir -p android-sdk/cmdline-tools
+      unzip -q commandlinetools.zip -d android-sdk/cmdline-tools
+      mv android-sdk/cmdline-tools/cmdline-tools android-sdk/cmdline-tools/latest
       rm commandlinetools.zip
 
-      mkdir -p ./android-sdk/cmdline-tools/latest
-      mv ./android-sdk/cmdline-tools/* ./android-sdk/cmdline-tools/latest/
-
+      # Configure les variables d'environnement
       export ANDROID_HOME=$PWD/android-sdk
       export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
       
@@ -29,23 +31,27 @@ tasks:
       sdkmanager "platforms;android-33" "build-tools;33.0.1" "platform-tools" >/dev/null
       
       echo "--- Environnement Android prêt ---"
+      
+      # --- ÉTAPE 3: Préparer les Scripts ---
+      echo "Correction des formats de fichiers et permissions..."
+      # Convertir les fins de ligne pour tous les scripts importants
+      dos2unix gradlew
+      # Donner la permission d'exécution IMMÉDIATEMENT
+      chmod +x ./gradlew
 
     command: |
-      # --- ÉTAPE 3: Forcer l'environnement et Compiler ---
-      echo "Préparation finale de l'environnement de compilation..."
-      
-      # Forcer l'utilisation de Java 17 en définissant JAVA_HOME
+      # --- ÉTAPE 4: Compiler l'APK ---
+      echo "Préparation à la compilation..."
+      # Recharger les variables d'environnement
+      source "/home/gitpod/.sdkman/bin/sdkman-init.sh"
+      export ANDROID_HOME=$PWD/android-sdk
+      export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
       export JAVA_HOME="/home/gitpod/.sdkman/candidates/java/17.0.10-zulu"
-      
-      # Tuer tout serveur Gradle qui aurait pu démarrer avec la mauvaise version de Java
-      echo "Arrêt des démons Gradle existants..."
+
+      echo "Arrêt des démons Gradle existants (au cas où)..."
       ./gradlew --stop
       
-      # Rendre le script exécutable
-      chmod +x ./gradlew
-      
-      echo "Lancement de la compilation de l'APK de débogage avec Java 17..."
-      # Lancer la compilation avec l'option pour forcer un nouveau démon si nécessaire
+      echo "Lancement de la compilation de l'APK de débogage..."
       ./gradlew assembleDebug --no-daemon
       
       echo "--- COMPILATION TERMINÉE ! ---"
