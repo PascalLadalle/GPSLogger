@@ -1,8 +1,16 @@
-# Configuration Gitpod pour Android - Version Simplifiée et Corrigée
+# Configuration Gitpod Finale et Complète
+
+# Spécifie une image Docker complète qui inclut plus d'outils par défaut
+image: gitpod/workspace-full
 
 tasks:
   - name: Setup & Build
     init: |
+      # --- ÉTAPE 0: Mettre à jour et installer les outils manquants ---
+      echo "Mise à jour de l'environnement et installation de dos2unix..."
+      sudo apt-get update
+      sudo apt-get install -y dos2unix
+
       # --- ÉTAPE 1: Installer et configurer Java 17 ---
       echo "Installation de Java 17..."
       sdk install java 17.0.10-zulu
@@ -10,17 +18,14 @@ tasks:
       source "/home/gitpod/.sdkman/bin/sdkman-init.sh"
       echo "--- Java 17 est maintenant la version par défaut ---"
       
-      # --- ÉTAPE 2: Installer le SDK Android (Logique Corrigée) ---
+      # --- ÉTAPE 2: Installer le SDK Android ---
       echo "Téléchargement des outils Android..."
       wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O commandlinetools.zip
-      
-      # Créer la structure de dossiers AVANT de décompresser
       mkdir -p android-sdk/cmdline-tools
       unzip -q commandlinetools.zip -d android-sdk/cmdline-tools
       mv android-sdk/cmdline-tools/cmdline-tools android-sdk/cmdline-tools/latest
       rm commandlinetools.zip
 
-      # Configure les variables d'environnement
       export ANDROID_HOME=$PWD/android-sdk
       export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
       
@@ -34,15 +39,12 @@ tasks:
       
       # --- ÉTAPE 3: Préparer les Scripts ---
       echo "Correction des formats de fichiers et permissions..."
-      # Convertir les fins de ligne pour tous les scripts importants
       dos2unix gradlew
-      # Donner la permission d'exécution IMMÉDIATEMENT
       chmod +x ./gradlew
 
     command: |
       # --- ÉTAPE 4: Compiler l'APK ---
       echo "Préparation à la compilation..."
-      # Recharger les variables d'environnement
       source "/home/gitpod/.sdkman/bin/sdkman-init.sh"
       export ANDROID_HOME=$PWD/android-sdk
       export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
