@@ -1,49 +1,47 @@
-# Configuration de l'environnement Gitpod pour le développement Android
+      
+# Configuration Gitpod Finale et Correcte
+
+# Spécifie une image Docker complète qui inclut plus d'outils par défaut
+image: gitpod/workspace-full
 
 tasks:
-  - name: Setup Android SDK
+  - name: "Préparation de l'Environnement"
+    # La tâche 'before' s'exécute AVANT que l'IDE et les serveurs de langage ne démarrent
+    before: |
+      echo "--- TÂCHE 'BEFORE' : Configuration de Java 17 ---"
+      sdk install java 17.0.10-zulu
+      sdk default java 17.0.10-zulu
+      source "/home/gitpod/.sdkman/bin/sdkman-init.sh"
+      echo "--- Java 17 est maintenant la version par défaut pour tout le workspace ---"
+
+  - name: "Installation et Compilation"
+    # La tâche 'init' s'exécute après 'before' pour préparer les dépendances
     init: |
-      # Télécharge les outils de ligne de commande Android
-      echo "Téléchargement des outils Android..."
-      wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O commandlinetools.zip
-      unzip -q commandlinetools.zip -d ./android-sdk
+      echo "--- TÂCHE 'INIT' : Installation du SDK Android ---"
+      sudo apt-get update && sudo apt-get install -y dos2unix
+      
+      wget -q https://dl.google.com/android/repository/commandlinetetools-linux-9477386_latest.zip -O commandlinetools.zip
+      mkdir -p android-sdk/cmdline-tools
+      unzip -q commandlinetools.zip -d android-sdk/cmdline-tools
+      mv android-sdk/cmdline-tools/cmdline-tools android-sdk/cmdline-tools/latest
       rm commandlinetools.zip
 
-      # Crée la structure de dossiers attendue par le SDK Manager
-      mkdir -p ./android-sdk/cmdline-tools/latest
-      mv ./android-sdk/cmdline-tools/* ./android-sdk/cmdline-tools/latest/
-
-      # Configure les variables d'environnement
       export ANDROID_HOME=$PWD/android-sdk
       export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
-      echo 'export ANDROID_HOME=$PWD/android-sdk' >> ~/.bashrc
-      echo 'export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools' >> ~/.bashrc
-
-      # Accepte automatiquement les licences Android (très important !)
-      echo "Acceptation des licences..."
+      
       yes | sdkmanager --licenses >/dev/null
-
-      # Installe les paquets nécessaires (plateforme et outils de build)
-      echo "Installation des paquets SDK..."
       sdkmanager "platforms;android-33" "build-tools;33.0.1" "platform-tools" >/dev/null
       
-      echo "Environnement Android prêt !"
-      
-  - name: Build & Serve
-    command: |
-      # Attendre que la configuration soit terminée
-      gp sync-await setup-ready
-
-      # Donner les permissions d'exécution au script Gradle
+      echo "--- Préparation des scripts Gradle ---"
+      dos2unix gradlew
       chmod +x ./gradlew
-      
-      # Compiler l'application pour la première fois
-      echo "Compilation de l'APK de débogage..."
-      ./gradlew assembleDebug
-      
-      echo "Compilation terminée ! L'APK se trouve dans app/build/outputs/apk/debug/"
 
-# Exposer les ports si nécessaire (pas pour ce projet, mais utile à savoir)
-# ports:
-#   - port: 8080
-#     onOpen: open-preview
+    # La tâche 'command' s'exécute à la fin pour lancer la compilation
+    command: |
+      echo "--- TÂCHE 'COMMAND' : Lancement de la compilation ---"
+      ./gradlew assembleDebug --no-daemon
+      
+      echo "--- COMPILATION TERMINÉE ! ---"
+      echo "L'APK se trouve dans le dossier : app/build/outputs/apk/debug/"
+
+    
