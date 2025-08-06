@@ -1,0 +1,52 @@
+# Configuration de l'environnement Gitpod pour le développement Android
+# AVEC SPÉCIFICATION DE JAVA 17
+
+tasks:
+  - name: Setup Java & Android SDK
+    init: |
+      # --- AJOUT IMPORTANT : Installer et configurer Java 17 ---
+      echo "Installation de Java 17..."
+      sdk install java 17.0.10-zulu
+      sdk default java 17.0.10-zulu
+      source "/home/gitpod/.sdkman/bin/sdkman-init.sh"
+      echo "Java 17 est maintenant la version par défaut."
+      
+      # Le reste du script est le même
+      echo "Téléchargement des outils Android..."
+      wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O commandlinetools.zip
+      unzip -q commandlinetools.zip -d ./android-sdk
+      rm commandlinetools.zip
+
+      mkdir -p ./android-sdk/cmdline-tools/latest
+      mv ./android-sdk/cmdline-tools/* ./android-sdk/cmdline-tools/latest/
+
+      export ANDROID_HOME=$PWD/android-sdk
+      export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+      echo 'export ANDROID_HOME=$PWD/android-sdk' >> ~/.bashrc
+      echo 'export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools' >> ~/.bashrc
+
+      echo "Acceptation des licences..."
+      yes | sdkmanager --licenses >/dev/null
+
+      echo "Installation des paquets SDK..."
+      sdkmanager "platforms;android-33" "build-tools;33.0.1" "platform-tools" >/dev/null
+      
+      echo "Environnement Android prêt !"
+      gp sync-done setup-ready # Signale que la configuration est terminée
+
+  - name: Build APK
+    command: |
+      # Attendre que la configuration soit terminée
+      gp sync-await setup-ready
+
+      chmod +x ./gradlew
+      
+      echo "Compilation de l'APK de débogage..."
+      ./gradlew assembleDebug
+      
+      echo "Compilation terminée ! L'APK se trouve dans app/build/outputs/apk/debug/"
+
+# Exposer les ports si nécessaire
+# ports:
+#   - port: 8080
+#     onOpen: open-preview
