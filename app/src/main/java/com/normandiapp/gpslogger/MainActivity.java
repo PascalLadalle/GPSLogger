@@ -1,4 +1,4 @@
-package com.example.geotrackerapp;
+package com.normandiapp.gpslogger;
 
 import android.Manifest;
 import android.content.Context;
