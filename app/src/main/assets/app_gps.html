@@ -85,23 +85,27 @@
             
             // --- SECTION 1 : INITIALISATION ---
 
-            // MODIFIÉ : Ajout de maxZoom pour autoriser un zoom numérique (flou) jusqu'au niveau 21
+            // On autorise l'utilisateur à zoomer jusqu'au niveau 21
             const map = L.map('map', { 
                 zoomControl: false,
-                maxZoom: 21
+                maxZoom: 21 
             });
 
             let directionMarker, accuracyCircle, isRecording = false;
             let currentTrack;
             let recordedItems = [], itemIdCounter = 0;
+            const simplificationTolerance = 5; 
 
             const imageBounds = [[8.466, -71.678], [8.485, -71.651]];
             
-            // MODIFIÉ : Ajout de maxNativeZoom pour indiquer à Leaflet d'arrêter de demander des tuiles après le niveau 19
+            // Configuration de la couche de carte en ligne
             let onlineTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
                 attribution: 'Esri', 
                 className: 'map-layer-online',
-                maxNativeZoom: 19 // Le serveur fournit des tuiles réelles jusqu'à ce niveau
+                // MODIFIÉ : maxZoom est ajouté pour activer l'étirement des tuiles au-delà du maxNativeZoom
+                maxZoom: 21,
+                // Le serveur ne fournit des tuiles réelles que jusqu'à ce niveau
+                maxNativeZoom: 19 
             });
             let offlineImageLayer = L.imageOverlay('map_background.jpg', imageBounds, { className: 'map-layer-offline' });
             
