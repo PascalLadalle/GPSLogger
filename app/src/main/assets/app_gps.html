@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <!-- Le nom de l'application est mis à jour dans le titre de l'onglet -->
     <title>GPSLogger</title>
     
+    <!-- Charge la feuille de style de Leaflet depuis le dossier local de l'application -->
     <link rel="stylesheet" href="./leaflet.css" />
 
     <style>
@@ -86,30 +86,15 @@
             
             // --- SECTION 1 : INITIALISATION ---
 
-            // MODIFIÉ : Ajout de maxZoom pour autoriser un zoom plus profond sur la carte
-            const map = L.map('map', { 
-                zoomControl: false,
-                maxZoom: 19 
-            });
-
-            // Variables d'état pour suivre l'application
+            const map = L.map('map', { zoomControl: false, maxZoom: 19 });
             let directionMarker, accuracyCircle, isRecording = false;
             let currentTrack;
             let recordedItems = [], itemIdCounter = 0;
-            const simplificationTolerance = 5; 
 
-            // Définition des couches de carte
             const imageBounds = [[8.466, -71.678], [8.485, -71.651]];
-            
-            // MODIFIÉ : Ajout de maxZoom pour obtenir les tuiles de plus haute résolution
-            let onlineTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
-                attribution: 'Esri', 
-                className: 'map-layer-online',
-                maxZoom: 19 
-            });
+            let onlineTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri', className: 'map-layer-online', maxZoom: 19 });
             let offlineImageLayer = L.imageOverlay('map_background.jpg', imageBounds, { className: 'map-layer-offline' });
             
-            // Références aux éléments du DOM
             const mapToggle = document.getElementById('map-toggle');
             const toggleRecordBtn = document.getElementById('toggle-record');
             const addPointBtn = document.getElementById('add-point');
@@ -201,8 +186,8 @@
                     
                     if (trackToFinalize && trackToFinalize.getLatLngs().length > 2) {
                         let points = trackToFinalize.getLatLngs();
-                        const simplifiedPoints = L.LineUtil.simplify(points, simplificationTolerance);
-                        trackToFinalize.setLatLngs(simplifiedPoints);
+                        const finalPoints = intelligentSimplify(points);
+                        trackToFinalize.setLatLngs(finalPoints);
                         
                         points = trackToFinalize.getLatLngs();
                         const firstPoint = points[0];
@@ -216,7 +201,7 @@
                             if(oldTrackItem) oldTrackItem.layer = polygon;
                             map.removeLayer(trackToFinalize);
                         }
-                        showNotification('Recorrido finalizado y simplificado.');
+                        showNotification('Recorrido finalizado y procesado.');
                     } else if (trackToFinalize) {
                         const itemToRemove = recordedItems.pop();
                         if (itemToRemove) map.removeLayer(itemToRemove.layer);
@@ -226,6 +211,23 @@
                     saveData();
                 }
             });
+
+            // Simplifie un parcours de manière adaptative pour ne pas perdre de données
+            function intelligentSimplify(points) {
+                if (points.length < 3) return points;
+                
+                const tolerances = [10, 5, 3, 1]; 
+                
+                for (const tolerance of tolerances) {
+                    const simplifiedPoints = L.LineUtil.simplify(points, tolerance);
+                    if (simplifiedPoints.length >= 3 && simplifiedPoints.length > points.length * 0.1) {
+                        return simplifiedPoints;
+                    }
+                }
+                
+                showNotification('Detalle del trazado conservado.');
+                return points;
+            }
 
             // Crée un nouveau tracé vide
             function startNewTrack() {
@@ -253,17 +255,33 @@
             
             // --- SECTION 5 : GESTION DES DONNÉES ET DE L'INTERFACE ---
 
-            // Sauvegarde la liste des points et parcours dans le stockage local du navigateur
+            // Gère le clic sur le bouton "Tout Supprimer"
+            deleteAllBtn.addEventListener('click', function() {
+                if (recordedItems.length === 0) {
+                    return showNotification('No hay nada que borrar.', 'error');
+                }
+                if (confirm('¿Estás seguro de que quieres borrar todos los elementos?')) {
+                    recordedItems.forEach(item => {
+                        if (item.layer && map.hasLayer(item.layer)) {
+                            map.removeLayer(item.layer);
+                        }
+                    });
+                    recordedItems = [];
+                    itemIdCounter = 0;
+                    updateItemList();
+                    saveData();
+                    showNotification('Todos los elementos han sido borrados.');
+                }
+            });
+
+            // Sauvegarde la liste des points et parcours dans le stockage local
             function saveData() { const savableItems = recordedItems.map(item => { const data = { id: item.id, name: item.name, type: item.type }; let coords; if (item.layer.getLatLngs) coords = item.layer.getLatLngs(); else coords = item.layer.getLatLng(); data.coords = coords; return data; }); localStorage.setItem('geoTrackerData', JSON.stringify(savableItems)); }
             
             // Charge les données depuis le stockage local
-            function loadData() { const savedData = localStorage.getItem('geoTrackerData'); if (!savedData) return; try { const parsedItems = JSON.parse(savedData); let maxId = 0; parsedItems.forEach(savedItem => { let layer; if (savedItem.type === 'point') { layer = L.marker(savedItem.coords).addTo(map).bindPopup(savedItem.name); } else { const points = savedItem.coords; if (points.length > 2 && L.latLng(points[0]).equals(L.latLng(points[points.length-1]))) { layer = L.polygon(points, {color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2}).addTo(map); } else { layer = L.polyline(points, { color: 'red', weight: 4 }).addTo(map); } } recordedItems.push({ id: savedItem.id, name: savedItem.name, type: savedItem.type, layer: layer }); const idNum = parseInt(savedItem.id.split('-')[1]); if (idNum > maxId) maxId = idNum; }); itemIdCounter = maxId; updateItemList(); } catch (e) { console.error("Error loading local data:", e); localStorage.removeItem('geoTrackerData'); } }
+            function loadData() { const savedData = localStorage.getItem('geoTrackerData'); if (!savedData) return; try { const parsedItems = JSON.parse(savedData); let maxId = 0; parsedItems.forEach(savedItem => { let layer; if (savedItem.type === 'point') { layer = L.marker(savedItem.coords).addTo(map).bindPopup(savedItem.name); } else { const points = Array.isArray(savedItem.coords) ? savedItem.coords.map(c => L.latLng(c.lat, c.lng)) : []; if (points.length > 2 && points[0].equals(points[points.length-1])) { layer = L.polygon(points, {color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2}).addTo(map); } else { layer = L.polyline(points, { color: 'red', weight: 4 }).addTo(map); } } recordedItems.push({ id: savedItem.id, name: savedItem.name, type: savedItem.type, layer: layer }); const idNum = parseInt(savedItem.id.split('-')[1]); if (idNum > maxId) maxId = idNum; }); itemIdCounter = maxId; updateItemList(); } catch (e) { console.error("Error loading local data:", e); localStorage.removeItem('geoTrackerData'); } }
             
             // Affiche une notification (toast) à l'écran
             function showNotification(message, type = 'success') { const notif = document.createElement('div'); notif.className = `toast-notification ${type}`; notif.textContent = message; notificationContainer.appendChild(notif); requestAnimationFrame(() => notif.classList.add('show')); setTimeout(() => { notif.classList.remove('show'); notif.addEventListener('transitionend', () => notif.remove(), { once: true }); }, 3500); }
-            
-            // Gère le clic sur le bouton "Tout Supprimer"
-            deleteAllBtn.addEventListener('click', function() { if (recordedItems.length === 0) return showNotification('No hay nada que borrar.', 'error'); if (confirm('¿Estás seguro de que quieres borrar todos los elementos?')) { recordedItems.forEach(item => { if (item.layer) map.removeLayer(item.layer); }); recordedItems = []; itemIdCounter = 0; updateItemList(); saveData(); showNotification('Todos los elementos han sido borrados.'); } });
             
             // Met à jour la liste des éléments dans le menu latéral
             function updateItemList() { itemList.innerHTML = ''; recordedItems.forEach(item => { const li = document.createElement('li'); const nameSpan = document.createElement('span'); nameSpan.className = 'item-name'; nameSpan.textContent = item.name; const actionsDiv = document.createElement('div'); actionsDiv.className = 'item-actions'; const renameBtn = document.createElement('button'); renameBtn.textContent = '✏️'; renameBtn.className = 'rename-btn'; renameBtn.title = 'Renombrar'; renameBtn.onclick = function() { const newName = prompt('Introduce el nuevo nombre:', item.name); if (newName && newName.trim()) { item.name = newName.trim(); if (item.layer.getPopup()) item.layer.setPopupContent(item.name); else item.layer.bindPopup(item.name); updateItemList(); saveData(); showNotification('Elemento renombrado.'); } }; const deleteBtn = document.createElement('button'); deleteBtn.textContent = '🗑️'; deleteBtn.className = 'delete-btn'; deleteBtn.title = 'Borrar'; deleteBtn.onclick = function() { map.removeLayer(item.layer); recordedItems = recordedItems.filter(i => i.id !== item.id); updateItemList(); saveData(); showNotification(`'${item.name}' ha sido borrado.`); }; actionsDiv.appendChild(renameBtn); actionsDiv.appendChild(deleteBtn); li.appendChild(nameSpan); li.appendChild(actionsDiv); itemList.appendChild(li); }); }
