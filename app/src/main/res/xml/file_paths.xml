@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- On autorise le partage des fichiers qui se trouvent dans le sous-dossier "kml_files" du cache -->
+    <cache-path name="kml_cache" path="kml_files/" />
+</paths>

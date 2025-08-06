@@ -1,7 +1,13 @@
 package com.normandiapp.gpslogger;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.FileProvider;
+
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -10,13 +16,14 @@ import android.hardware.SensorManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Bundle;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import java.util.List;
+
+import java.io.File;
+import java.io.FileOutputStream;
 
 public class MainActivity extends AppCompatActivity implements LocationListener, SensorEventListener {
 
@@ -33,17 +40,19 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
         webView = findViewById(R.id.webview);
         webView.setWebViewClient(new WebViewClient());
         webView.getSettings().setJavaScriptEnabled(true);
-        webView.getSettings().setDomStorageEnabled(true); // Activer le localStorage pour le JS
+        webView.getSettings().setDomStorageEnabled(true);
 
-        // Charger notre page HTML locale
+        // --- PONT JAVASCRIPT ---
+        // On attache notre classe Java "WebAppInterface" au JavaScript.
+        // Dans le JS, on pourra appeler ses méthodes via l'objet "Android".
+        webView.addJavascriptInterface(new WebAppInterface(this), "Android");
+
         webView.loadUrl("file:///android_asset/app_gps.html");
 
-        // Initialiser les services de localisation et les capteurs
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         orientationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION);
 
-        // Demander les autorisations
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
         } else {
@@ -51,43 +60,71 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
         }
     }
 
+    // Classe interne qui contient les méthodes accessibles depuis le JavaScript
+    public class WebAppInterface {
+        Context mContext;
+
+        WebAppInterface(Context c) {
+            mContext = c;
+        }
+
+        // Cette annotation est obligatoire pour que la méthode soit visible par le JS
+        @JavascriptInterface
+        public void shareKml(String kmlContent, String fileName) {
+            try {
+                // Créer un fichier temporaire dans le dossier cache de l'application
+                File cachePath = new File(mContext.getCacheDir(), "kml_files");
+                cachePath.mkdirs(); // Crée le dossier s'il n'existe pas
+                File file = new File(cachePath, fileName);
+                FileOutputStream stream = new FileOutputStream(file);
+                stream.write(kmlContent.getBytes());
+                stream.close();
+
+                // Obtenir une URI sécurisée pour ce fichier via le FileProvider
+                Uri contentUri = FileProvider.getUriForFile(mContext, "com.normandiapp.gpslogger.provider", file);
+
+                if (contentUri != null) {
+                    Intent shareIntent = new Intent();
+                    shareIntent.setAction(Intent.ACTION_SEND);
+                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); // Permission de lecture temporaire
+                    shareIntent.setType("application/vnd.google-earth.kml+xml");
+                    shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+
+                    // Lancer la boîte de dialogue de partage d'Android
+                    startActivity(Intent.createChooser(shareIntent, "Compartir KML"));
+                }
+            } catch (Exception e) {
+                // En cas d'erreur, on l'affiche dans les logs pour le débogage
+                e.printStackTrace();
+            }
+        }
+    }
+
     private void startGpsUpdates() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            // Demander des mises à jour très fréquentes : toutes les 500ms et à chaque mètre.
             locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 500, 1, this);
         }
     }
 
     @Override
     public void onLocationChanged(@NonNull Location location) {
-        // Un nouveau point GPS est arrivé ! On l'envoie au JavaScript.
         final double lat = location.getLatitude();
         final double lng = location.getLongitude();
         final float accuracy = location.getAccuracy();
-
-        // Utiliser evaluateJavascript pour appeler une fonction JS
-        webView.post(() -> {
-            webView.evaluateJavascript(String.format("javascript:updatePositionFromNative(%f, %f, %f);", lat, lng, accuracy), null);
-        });
+        webView.post(() -> webView.evaluateJavascript(String.format("javascript:updatePositionFromNative(%f, %f, %f);", lat, lng, accuracy), null));
     }
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        // Une nouvelle orientation est arrivée ! On l'envoie au JavaScript.
         if (event.sensor.getType() == Sensor.TYPE_ORIENTATION) {
             final float heading = event.values[0];
-            webView.post(() -> {
-                webView.evaluateJavascript(String.format("javascript:updateHeadingFromNative(%f);", heading), null);
-            });
+            webView.post(() -> webView.evaluateJavascript(String.format("javascript:updateHeadingFromNative(%f);", heading), null));
         }
     }
 
     @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {
-        // Pas nécessaire pour notre cas
-    }
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {}
 
-    // Gérer la réponse à la demande d'autorisation
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -96,7 +133,6 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
         }
     }
     
-    // S'assurer de démarrer et arrêter les capteurs avec l'activité
     @Override
     protected void onResume() {
         super.onResume();

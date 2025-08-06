@@ -1,60 +1,49 @@
-# Configuration Gitpod Finale et Complète
-
-# Spécifie une image Docker complète qui inclut plus d'outils par défaut
-image: gitpod/workspace-full
+# Configuration de l'environnement Gitpod pour le développement Android
 
 tasks:
-  - name: Setup & Build
+  - name: Setup Android SDK
     init: |
-      # --- ÉTAPE 0: Mettre à jour et installer les outils manquants ---
-      echo "Mise à jour de l'environnement et installation de dos2unix..."
-      sudo apt-get update
-      sudo apt-get install -y dos2unix
-
-      # --- ÉTAPE 1: Installer et configurer Java 17 ---
-      echo "Installation de Java 17..."
-      sdk install java 17.0.10-zulu
-      sdk default java 17.0.10-zulu
-      source "/home/gitpod/.sdkman/bin/sdkman-init.sh"
-      echo "--- Java 17 est maintenant la version par défaut ---"
-      
-      # --- ÉTAPE 2: Installer le SDK Android ---
+      # Télécharge les outils de ligne de commande Android
       echo "Téléchargement des outils Android..."
       wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O commandlinetools.zip
-      mkdir -p android-sdk/cmdline-tools
-      unzip -q commandlinetools.zip -d android-sdk/cmdline-tools
-      mv android-sdk/cmdline-tools/cmdline-tools android-sdk/cmdline-tools/latest
+      unzip -q commandlinetools.zip -d ./android-sdk
       rm commandlinetools.zip
 
+      # Crée la structure de dossiers attendue par le SDK Manager
+      mkdir -p ./android-sdk/cmdline-tools/latest
+      mv ./android-sdk/cmdline-tools/* ./android-sdk/cmdline-tools/latest/
+
+      # Configure les variables d'environnement
       export ANDROID_HOME=$PWD/android-sdk
       export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
-      
+      echo 'export ANDROID_HOME=$PWD/android-sdk' >> ~/.bashrc
+      echo 'export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools' >> ~/.bashrc
+
+      # Accepte automatiquement les licences Android (très important !)
       echo "Acceptation des licences..."
       yes | sdkmanager --licenses >/dev/null
 
+      # Installe les paquets nécessaires (plateforme et outils de build)
       echo "Installation des paquets SDK..."
       sdkmanager "platforms;android-33" "build-tools;33.0.1" "platform-tools" >/dev/null
       
-      echo "--- Environnement Android prêt ---"
+      echo "Environnement Android prêt !"
       
-      # --- ÉTAPE 3: Préparer les Scripts ---
-      echo "Correction des formats de fichiers et permissions..."
-      dos2unix gradlew
-      chmod +x ./gradlew
-
+  - name: Build & Serve
     command: |
-      # --- ÉTAPE 4: Compiler l'APK ---
-      echo "Préparation à la compilation..."
-      source "/home/gitpod/.sdkman/bin/sdkman-init.sh"
-      export ANDROID_HOME=$PWD/android-sdk
-      export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
-      export JAVA_HOME="/home/gitpod/.sdkman/candidates/java/17.0.10-zulu"
+      # Attendre que la configuration soit terminée
+      gp sync-await setup-ready
 
-      echo "Arrêt des démons Gradle existants (au cas où)..."
-      ./gradlew --stop
+      # Donner les permissions d'exécution au script Gradle
+      chmod +x ./gradlew
       
-      echo "Lancement de la compilation de l'APK de débogage..."
-      ./gradlew assembleDebug --no-daemon
+      # Compiler l'application pour la première fois
+      echo "Compilation de l'APK de débogage..."
+      ./gradlew assembleDebug
       
-      echo "--- COMPILATION TERMINÉE ! ---"
-      echo "L'APK se trouve dans le dossier : app/build/outputs/apk/debug/"
+      echo "Compilation terminée ! L'APK se trouve dans app/build/outputs/apk/debug/"
+
+# Exposer les ports si nécessaire (pas pour ce projet, mais utile à savoir)
+# ports:
+#   - port: 8080
+#     onOpen: open-preview

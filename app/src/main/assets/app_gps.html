@@ -2,139 +2,27 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <!-- Assure un affichage correct et empêche le zoom par pincement sur mobile -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Geo Tracker</title>
     
-    <!-- Charge la feuille de style de Leaflet depuis le dossier local de l'application -->
+    <!-- Liens locaux pour un fonctionnement hors ligne -->
     <link rel="stylesheet" href="./leaflet.css" />
 
     <style>
-        /* --- Structure Générale --- */
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-        }
-        #map {
-            height: 100%;
-            width: 100%;
-            z-index: 1;
-            background-color: #e0e0e0; /* Couleur de fond en attendant la carte */
-        }
-
-        /* --- Superposition pour le menu --- */
-        #map-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 999;
-            display: none;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        #map-overlay.visible {
-            display: block;
-            opacity: 1;
-        }
-
-        /* --- Notifications (Toasts) --- */
-        #notification-container {
-            position: fixed;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1001;
-            pointer-events: none;
-            width: 90%;
-            max-width: 500px;
-        }
-        .toast-notification {
-            padding: 12px 25px;
-            border-radius: 25px;
-            color: white;
-            background-color: rgba(0, 0, 0, 0.75);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            margin-bottom: 10px;
-            opacity: 0;
-            transform: translateY(-30px);
-            transition: opacity 0.4s ease, transform 0.4s ease;
-            text-align: center;
-        }
-        .toast-notification.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
-        .toast-notification.error {
-            background-color: #dc3545;
-        }
-
-        /* --- Contrôles sur la Carte --- */
-        #controls {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 2;
-            display: flex;
-            gap: 10px;
-        }
-        #controls button {
-            padding: 15px 20px;
-            font-size: 16px;
-            border-radius: 50px;
-            border: 2px solid #fff;
-            background-color: #007BFF;
-            color: white;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        /* --- Menu Latéral --- */
-        #menu-toggle {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 2;
-            padding: 10px 15px;
-            font-size: 24px;
-            border-radius: 50%;
-            border: 2px solid #ccc;
-            background-color: white;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        }
-        #menu {
-            position: fixed;
-            top: 0;
-            left: -300px;
-            width: 280px;
-            height: 100%;
-            background-color: white;
-            z-index: 1000;
-            transition: left 0.3s ease-in-out;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
-        }
-        #menu.open {
-            left: 0;
-        }
-        #menu-header {
-            padding: 15px 20px;
-            background-color: #f8f9fa;
-            border-bottom: 1px solid #ddd;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        #map { height: 100%; width: 100%; z-index: 1; background-color: #e0e0e0; }
+        #map-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 999; display: none; opacity: 0; transition: opacity 0.3s ease; }
+        #map-overlay.visible { display: block; opacity: 1; }
+        #notification-container { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1001; pointer-events: none; width: 90%; max-width: 500px; }
+        .toast-notification { padding: 12px 25px; border-radius: 25px; color: white; background-color: rgba(0, 0, 0, 0.75); box-shadow: 0 4px 12px rgba(0,0,0,0.2); margin-bottom: 10px; opacity: 0; transform: translateY(-30px); transition: opacity 0.4s ease, transform 0.4s ease; text-align: center; }
+        .toast-notification.show { opacity: 1; transform: translateY(0); }
+        .toast-notification.error { background-color: #dc3545; }
+        #controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2; display: flex; gap: 10px; }
+        #controls button { padding: 15px 20px; font-size: 16px; border-radius: 50px; border: 2px solid #fff; background-color: #007BFF; color: white; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        #menu-toggle { position: absolute; top: 20px; left: 20px; z-index: 2; padding: 10px 15px; font-size: 24px; border-radius: 50%; border: 2px solid #ccc; background-color: white; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        #menu { position: fixed; top: 0; left: -300px; width: 280px; height: 100%; background-color: white; z-index: 1000; transition: left 0.3s ease-in-out; display: flex; flex-direction: column; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }
+        #menu.open { left: 0; }
+        #menu-header { padding: 15px 20px; background-color: #f8f9fa; border-bottom: 1px solid #ddd; display: flex; align-items: center; justify-content: space-between; }
         #menu-header h3 { margin: 0; font-size: 18px; }
         #menu-close { background: none; border: none; font-size: 28px; cursor: pointer; padding: 0 10px; line-height: 1; color: #666; }
         #export-share-container { padding: 20px; background-color: #f8f9fa; }
@@ -147,67 +35,52 @@
         .rename-btn { background-color: #007BFF; }
         .delete-btn { background-color: #dc3545; }
         #menu-footer { padding: 20px; border-top: 1px solid #ddd; background-color: #f8f9fa; }
-        #delete-all { width: 100%; padding: 15px; background-color: #dc3545; color: white; border: none; cursor: pointer; font-size: 16px; }
-        
-        /* --- Icône de Direction (Flèche) --- */
-        .direction-arrow {
-            width: 0;
-            height: 0;
-            border-left: 10px solid transparent;
-            border-right: 10px solid transparent;
-            border-bottom: 25px solid #007BFF;
-            transition: transform 0.2s linear; /* Rotation fluide */
-            transform-origin: center 15px; /* Assure que la flèche pivote sur sa base */
-        }
-        .direction-accuracy {
-            background-color: rgba(0, 123, 255, 0.1);
-            border-radius: 50%;
-            border: 1px solid #007BFF;
-        }
+        #delete-all { width: 100%; padding: 15px; background-color: #dc3545; color: white; border: none; cursor: pointer; font-size: 16px; margin-top: 15px; }
+        .direction-arrow { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 25px solid #007BFF; transition: transform 0.2s linear; transform-origin: center 15px; }
+        .direction-accuracy { background-color: rgba(0, 123, 255, 0.1); border-radius: 50%; border: 1px solid #007BFF; }
+        .toggle-container { display: flex; align-items: center; justify-content: space-around; font-size: 14px;}
+        .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #2196F3; }
+        input:checked + .slider:before { transform: translateX(26px); }
     </style>
 </head>
 <body>
-    <!-- Structure HTML de l'interface -->
     <div id="notification-container"></div>
     <div id="map"></div>
     <div id="map-overlay"></div>
-    <div id="controls">
-        <button id="toggle-record">Iniciar Grabación</button>
-        <button id="add-point">Crear Punto</button>
-    </div>
+    <div id="controls"><button id="toggle-record">Iniciar Grabación</button><button id="add-point">Crear Punto</button></div>
     <button id="menu-toggle">☰</button>
     <div id="menu">
-        <div id="menu-header">
-            <h3>Mis Trazados</h3>
-            <button id="menu-close">×</button>
-        </div>
-        <div id="export-share-container">
-            <button id="export-share">Exportar y Compartir Todo</button>
-        </div>
+        <div id="menu-header"><h3>Mis Trazados</h3><button id="menu-close">×</button></div>
+        <div id="export-share-container"><button id="export-share">Exportar y Compartir Todo</button></div>
         <ul id="item-list"></ul>
         <div id="menu-footer">
+            <div class="toggle-container">
+                <span>Offline</span>
+                <label class="switch"><input type="checkbox" id="map-toggle"><span class="slider"></span></label>
+                <span>Online</span>
+            </div>
             <button id="delete-all">Borrar Todo</button>
         </div>
     </div>
 
-    <!-- Charge le script de Leaflet depuis le dossier local de l'application -->
     <script src="./leaflet.js"></script>
     
     <script>
-        // Attend que toute la page HTML soit chargée avant d'exécuter le script
         document.addEventListener('DOMContentLoaded', function() {
-            
-            // --- SECTION 1 : INITIALISATION ---
-
-            // Initialise la carte Leaflet sans vue par défaut, car elle sera définie par l'image
-            const map = L.map('map');
-
-            // Variables d'état pour suivre l'application
+            const map = L.map('map', { zoomControl: false });
             let directionMarker, accuracyCircle, isRecording = false;
             let currentTrack;
             let recordedItems = [], itemIdCounter = 0;
 
-            // Références aux éléments du DOM pour un accès rapide
+            const imageBounds = [[8.466, -71.678], [8.485, -71.651]];
+            let onlineTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri', className: 'map-layer-online' });
+            let offlineImageLayer = L.imageOverlay('map_background.jpg', imageBounds, { className: 'map-layer-offline' });
+            
+            const mapToggle = document.getElementById('map-toggle');
             const toggleRecordBtn = document.getElementById('toggle-record');
             const addPointBtn = document.getElementById('add-point');
             const menuToggleBtn = document.getElementById('menu-toggle');
@@ -218,125 +91,95 @@
             const exportShareBtn = document.getElementById('export-share');
             const deleteAllBtn = document.getElementById('delete-all');
             const notificationContainer = document.getElementById('notification-container');
-            
 
-            // --- SECTION 2 : CONFIGURATION DU FOND DE CARTE ---
+            // --- Configuration Initiale ---
 
-            // Les coordonnées de votre image statique exportée depuis QGIS
-            // Format : [[Latitude_Sud, Longitude_Ouest], [Latitude_Nord, Longitude_Est]]
-            const imageBounds = [
-                [8.466, -71.678],  // Coin Sud-Ouest: [Y min, X min]
-                [8.485, -71.651]   // Coin Nord-Est: [Y max, X max]
-            ];
+            // Corrige les icônes manquantes en mode local
+            delete L.Icon.Default.prototype._getIconUrl;
+            L.Icon.Default.mergeOptions({
+                iconUrl: './images/marker-icon.png',
+                iconRetinaUrl: './images/marker-icon-2x.png',
+                shadowUrl: './images/marker-shadow.png'
+            });
 
-            // Affiche l'image locale comme fond de carte
-            L.imageOverlay('map_background.jpg', imageBounds).addTo(map);
-            
-            // Centre et zoome la carte pour qu'elle corresponde exactement aux dimensions de l'image
-            map.fitBounds(imageBounds);
+            // --- Pont Natif ---
 
-
-            // --- SECTION 3 : "PONT" DE COMMUNICATION NATIF -> WEB ---
-
-            // Cette fonction est la porte d'entrée pour les données GPS.
-            // Elle sera appelée par le code natif Android à chaque nouvelle position.
             window.updatePositionFromNative = function(lat, lng, accuracy) {
                 const newLatLng = L.latLng(lat, lng);
-                
-                // Si la flèche de direction n'existe pas, on la crée
                 if (!directionMarker) {
                     const arrowIcon = L.divIcon({ className: 'direction-arrow', iconSize: [20, 25], iconAnchor: [10, 25] });
                     directionMarker = L.marker(newLatLng, { icon: arrowIcon }).addTo(map);
                     accuracyCircle = L.circle(newLatLng, { radius: accuracy, className: 'direction-accuracy' }).addTo(map);
+                    // On ne centre la vue que si on est en mode online, sinon on respecte les limites de l'image
+                    if (mapToggle.checked) {
+                        map.setView(newLatLng, 18);
+                    }
                 } else {
-                    // Sinon, on met simplement à jour sa position et le cercle de précision
                     directionMarker.setLatLng(newLatLng);
                     accuracyCircle.setLatLng(newLatLng).setRadius(accuracy);
                 }
-
-                // Si l'enregistrement est en cours, on ajoute le point au tracé
                 if (isRecording && currentTrack) {
                     const trackPoints = currentTrack.getLatLngs();
-                    // On vérifie que le nouveau point n'est pas identique au précédent pour éviter les doublons
                     if (trackPoints.length === 0 || !newLatLng.equals(trackPoints[trackPoints.length - 1])) {
                         currentTrack.addLatLng(newLatLng);
                     }
                 }
             };
 
-            // Cette fonction est la porte d'entrée pour les données de la boussole.
-            // Elle sera appelée par le code natif Android à chaque changement d'orientation.
             window.updateHeadingFromNative = function(heading) {
                 if (directionMarker && directionMarker.getElement()) {
-                    // On applique une transformation CSS pour faire pivoter la flèche. C'est très performant.
                     directionMarker.getElement().style.transform = `rotate(${heading}deg)`;
                 }
             };
 
+            // --- Logique du Toggle Online/Offline ---
 
-            // --- SECTION 4 : SAUVEGARDE ET CHARGEMENT (localStorage) ---
-
-            // Sauvegarde la liste des points et parcours dans le stockage local du navigateur
-            function saveData() {
-                // On ne peut pas sauvegarder les objets Leaflet directement. On extrait les données utiles.
-                const savableItems = recordedItems.map(item => {
-                    const data = { id: item.id, name: item.name, type: item.type };
-                    if (item.type === 'point') { data.coords = item.layer.getLatLng(); } 
-                    else if (item.type === 'track') { data.coords = item.layer.getLatLngs(); }
-                    return data;
+            function setMapMode(isOnline) {
+                map.eachLayer(function(layer) {
+                    if (layer instanceof L.ImageOverlay || layer instanceof L.TileLayer) {
+                        map.removeLayer(layer);
+                    }
                 });
-                // On convertit l'objet en texte JSON pour le stocker
-                localStorage.setItem('geoTrackerData', JSON.stringify(savableItems));
-            }
 
-            // Charge les données depuis le stockage local au démarrage de l'application
-            function loadData() {
-                const savedData = localStorage.getItem('geoTrackerData');
-                if (!savedData) return; // Aucune donnée à charger
-
-                try {
-                    const parsedItems = JSON.parse(savedData);
-                    let maxId = 0;
-
-                    // On recrée les objets Leaflet (marqueurs, tracés) à partir des données sauvegardées
-                    parsedItems.forEach(savedItem => {
-                        let layer;
-                        if (savedItem.type === 'point') { 
-                            layer = L.marker(savedItem.coords).addTo(map).bindPopup(savedItem.name); 
-                        } else { 
-                            layer = L.polyline(savedItem.coords, { color: 'red', weight: 4 }).addTo(map); 
-                        }
-                        recordedItems.push({ id: savedItem.id, name: savedItem.name, type: savedItem.type, layer: layer });
-                        
-                        // On s'assure que les nouveaux ID ne créent pas de conflit
-                        const idNum = parseInt(savedItem.id.split('-')[1]);
-                        if (idNum > maxId) maxId = idNum;
-                    });
-                    itemIdCounter = maxId;
-                    updateItemList(); // On met à jour la liste dans le menu
-                } catch (e) {
-                    console.error("Erreur lors du chargement des données locales :", e);
-                    localStorage.removeItem('geoTrackerData'); // Nettoyer les données corrompues
+                if (isOnline) {
+                    onlineTileLayer.addTo(map);
+                    // Ajouter le contrôle de zoom uniquement en mode online
+                    if (!map.zoomControl) {
+                        map.zoomControl = L.control.zoom().addTo(map);
+                    }
+                } else {
+                    offlineImageLayer.addTo(map);
+                    map.fitBounds(imageBounds);
+                    // Retirer le contrôle de zoom en mode offline
+                    if (map.zoomControl) {
+                        map.removeControl(map.zoomControl);
+                        map.zoomControl = null;
+                    }
                 }
+                localStorage.setItem('mapMode', isOnline ? 'online' : 'offline');
+                mapToggle.checked = isOnline;
             }
 
-
-            // --- SECTION 5 : LOGIQUE APPLICATIVE (Boutons et Enregistrement) ---
-
-            // Gère le clic sur le bouton d'enregistrement
+            mapToggle.addEventListener('change', function() {
+                setMapMode(this.checked);
+            });
+            
+            // --- Logique Applicative ---
+            
+            function saveData() { const savableItems = recordedItems.map(item => { const data = { id: item.id, name: item.name, type: item.type }; if (item.type === 'point') { data.coords = item.layer.getLatLng(); } else if (item.type === 'track') { data.coords = item.layer.getLatLngs(); } return data; }); localStorage.setItem('geoTrackerData', JSON.stringify(savableItems)); }
+            function loadData() { const savedData = localStorage.getItem('geoTrackerData'); if (!savedData) return; try { const parsedItems = JSON.parse(savedData); let maxId = 0; parsedItems.forEach(savedItem => { let layer; if (savedItem.type === 'point') { layer = L.marker(savedItem.coords).addTo(map).bindPopup(savedItem.name); } else { layer = L.polyline(savedItem.coords, { color: 'red', weight: 4 }).addTo(map); } recordedItems.push({ id: savedItem.id, name: savedItem.name, type: savedItem.type, layer: layer }); const idNum = parseInt(savedItem.id.split('-')[1]); if (idNum > maxId) maxId = idNum; }); itemIdCounter = maxId; updateItemList(); } catch (e) { console.error("Error loading local data:", e); localStorage.removeItem('geoTrackerData'); } }
+            function showNotification(message, type = 'success') { const notif = document.createElement('div'); notif.className = `toast-notification ${type}`; notif.textContent = message; notificationContainer.appendChild(notif); requestAnimationFrame(() => notif.classList.add('show')); setTimeout(() => { notif.classList.remove('show'); notif.addEventListener('transitionend', () => notif.remove(), { once: true }); }, 3500); }
+            
             toggleRecordBtn.addEventListener('click', function() {
                 isRecording = !isRecording;
                 this.textContent = isRecording ? 'Detener Grabación' : 'Iniciar Grabación';
                 this.style.backgroundColor = isRecording ? '#dc3545' : '#007BFF';
-                
                 if (isRecording) {
                     startNewTrack();
                     showNotification('Grabación iniciada.');
                 } else {
                     const trackToFinalize = currentTrack;
                     currentTrack = null; 
-                    
-                    // Si le parcours est trop court, on le supprime
                     if (trackToFinalize && trackToFinalize.getLatLngs().length < 2) {
                         const itemToRemove = recordedItems.pop();
                         if (itemToRemove) map.removeLayer(itemToRemove.layer);
@@ -345,128 +188,55 @@
                     } else {
                         showNotification('Recorrido finalizado y guardado.');
                     }
-                    saveData(); // On sauvegarde dans tous les cas
-                }
-            });
-
-            // Crée un nouveau tracé vide
-            function startNewTrack() {
-                const id = `track-${++itemIdCounter}`;
-                const trackName = `Recorrido ${itemIdCounter}`;
-                currentTrack = L.polyline([], { color: 'red', weight: 4 }).addTo(map);
-                recordedItems.push({ id, name: trackName, type: 'track', layer: currentTrack });
-                updateItemList();
-            }
-
-            // Gère le clic sur le bouton de création de point
-            addPointBtn.addEventListener('click', function() {
-                if (!directionMarker) return showNotification('Posición no encontrada.', 'error');
-                const id = `point-${++itemIdCounter}`;
-                const pointName = `Punto ${itemIdCounter}`;
-                const latlng = directionMarker.getLatLng();
-                const point = L.marker(latlng).addTo(map).bindPopup(pointName);
-                recordedItems.push({ id, name: pointName, type: 'point', layer: point });
-                updateItemList();
-                saveData();
-                showNotification(`Nuevo punto creado: ${pointName}`);
-            });
-
-            // Gère le clic sur le bouton "Tout Supprimer"
-            deleteAllBtn.addEventListener('click', function() {
-                if (recordedItems.length === 0) return showNotification('No hay nada que borrar.', 'error');
-                if (confirm('¿Estás seguro de que quieres borrar todos los elementos?')) {
-                    recordedItems.forEach(item => { if (item.layer) map.removeLayer(item.layer); });
-                    recordedItems = [];
-                    itemIdCounter = 0;
-                    updateItemList();
                     saveData();
-                    showNotification('Todos los elementos han sido borrados.');
                 }
             });
 
-
-            // --- SECTION 6 : GESTION DE L'INTERFACE (Menu, Liste, Notifications) ---
-
-            // Met à jour la liste des éléments dans le menu latéral
-            function updateItemList() {
-                itemList.innerHTML = '';
-                recordedItems.forEach(item => {
-                    const li = document.createElement('li');
-                    const nameSpan = document.createElement('span');
-                    nameSpan.className = 'item-name';
-                    nameSpan.textContent = item.name;
-
-                    const actionsDiv = document.createElement('div');
-                    actionsDiv.className = 'item-actions';
-                    
-                    // Bouton Renommer
-                    const renameBtn = document.createElement('button');
-                    renameBtn.textContent = '✏️';
-                    renameBtn.className = 'rename-btn';
-                    renameBtn.title = 'Renombrar';
-                    renameBtn.onclick = function() {
-                        const newName = prompt('Introduce el nuevo nombre:', item.name);
-                        if (newName && newName.trim()) {
-                            item.name = newName.trim();
-                            if (item.layer.getPopup()) {
-                                item.layer.setPopupContent(item.name);
-                            } else {
-                                item.layer.bindPopup(item.name);
-                            }
-                            updateItemList();
-                            saveData();
-                            showNotification('Elemento renombrado.');
-                        }
-                    };
-
-                    // Bouton Supprimer
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.textContent = '🗑️';
-                    deleteBtn.className = 'delete-btn';
-                    deleteBtn.title = 'Borrar';
-                    deleteBtn.onclick = function() {
-                        map.removeLayer(item.layer);
-                        recordedItems = recordedItems.filter(i => i.id !== item.id);
-                        updateItemList();
-                        saveData();
-                        showNotification(`'${item.name}' ha sido borrado.`);
-                    };
-
-                    actionsDiv.appendChild(renameBtn);
-                    actionsDiv.appendChild(deleteBtn);
-                    li.appendChild(nameSpan);
-                    li.appendChild(actionsDiv);
-                    itemList.appendChild(li);
-                });
-            }
-
-            // Affiche une notification (toast) à l'écran
-            function showNotification(message, type = 'success') {
-                const notif = document.createElement('div');
-                notif.className = `toast-notification ${type}`;
-                notif.textContent = message;
-                notificationContainer.appendChild(notif);
-                requestAnimationFrame(() => notif.classList.add('show'));
-                setTimeout(() => {
-                    notif.classList.remove('show');
-                    notif.addEventListener('transitionend', () => notif.remove(), { once: true });
-                }, 3500);
-            }
-
-            // Fonctions pour ouvrir et fermer le menu
+            function startNewTrack() { const id = `track-${++itemIdCounter}`; const trackName = `Recorrido ${itemIdCounter}`; currentTrack = L.polyline([], { color: 'red', weight: 4 }).addTo(map); recordedItems.push({ id, name: trackName, type: 'track', layer: currentTrack }); updateItemList(); }
+            addPointBtn.addEventListener('click', function() { if (!directionMarker) return showNotification('Posición no encontrada.', 'error'); const id = `point-${++itemIdCounter}`; const pointName = `Punto ${itemIdCounter}`; const latlng = directionMarker.getLatLng(); const point = L.marker(latlng).addTo(map).bindPopup(pointName); recordedItems.push({ id, name: pointName, type: 'point', layer: point }); updateItemList(); saveData(); showNotification(`Nuevo punto creado: ${pointName}`); });
+            deleteAllBtn.addEventListener('click', function() { if (recordedItems.length === 0) return showNotification('No hay nada que borrar.', 'error'); if (confirm('¿Estás seguro de que quieres borrar todos los elementos?')) { recordedItems.forEach(item => { if (item.layer) map.removeLayer(item.layer); }); recordedItems = []; itemIdCounter = 0; updateItemList(); saveData(); showNotification('Todos los elementos han sido borrados.'); } });
+            function updateItemList() { itemList.innerHTML = ''; recordedItems.forEach(item => { const li = document.createElement('li'); const nameSpan = document.createElement('span'); nameSpan.className = 'item-name'; nameSpan.textContent = item.name; const actionsDiv = document.createElement('div'); actionsDiv.className = 'item-actions'; const renameBtn = document.createElement('button'); renameBtn.textContent = '✏️'; renameBtn.className = 'rename-btn'; renameBtn.title = 'Renombrar'; renameBtn.onclick = function() { const newName = prompt('Introduce el nuevo nombre:', item.name); if (newName && newName.trim()) { item.name = newName.trim(); if (item.layer.getPopup()) item.layer.setPopupContent(item.name); else item.layer.bindPopup(item.name); updateItemList(); saveData(); showNotification('Elemento renombrado.'); } }; const deleteBtn = document.createElement('button'); deleteBtn.textContent = '🗑️'; deleteBtn.className = 'delete-btn'; deleteBtn.title = 'Borrar'; deleteBtn.onclick = function() { map.removeLayer(item.layer); recordedItems = recordedItems.filter(i => i.id !== item.id); updateItemList(); saveData(); showNotification(`'${item.name}' ha sido borrado.`); }; actionsDiv.appendChild(renameBtn); actionsDiv.appendChild(deleteBtn); li.appendChild(nameSpan); li.appendChild(actionsDiv); itemList.appendChild(li); }); }
             function openMenu() { menu.classList.add('open'); mapOverlay.classList.add('visible'); }
             function closeMenu() { menu.classList.remove('open'); mapOverlay.classList.remove('visible'); }
             menuCloseBtn.addEventListener('click', closeMenu);
             menuToggleBtn.addEventListener('click', (e) => { e.stopPropagation(); openMenu(); });
             mapOverlay.addEventListener('click', closeMenu);
-            
-            // Le partage de fichier est plus fiable s'il est géré par le code natif.
-            // Ce bouton affiche un message informatif.
+
             exportShareBtn.addEventListener('click', function() {
-                showNotification('Esta función debe ser manejada por la app nativa.', 'error');
+                if (recordedItems.length === 0) return showNotification('No hay elementos para exportar.', 'error');
+                showNotification('Generando archivo KML...');
+                const kmlContent = generateKML();
+                const fileName = `export_geotracker_${new Date().toISOString().slice(0,10)}.kml`;
+                if (window.Android && typeof window.Android.shareKml === 'function') {
+                    window.Android.shareKml(kmlContent, fileName);
+                } else {
+                    showNotification('Función de compartir no disponible.', 'error');
+                }
             });
+
+            function generateKML() {
+                let kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n`;
+                recordedItems.forEach(item => {
+                    if (item.type === 'track' && (!item.layer || item.layer.getLatLngs().length === 0)) return;
+                    const safeName = item.name.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>');
+                    kml += `    <Placemark>\n      <name>${safeName}</name>\n`;
+                    if (item.type === 'point') {
+                        const coords = item.layer.getLatLng();
+                        kml += `      <Point>\n        <coordinates>${coords.lng},${coords.lat},0</coordinates>\n      </Point>\n`;
+                    } else if (item.type === 'track') {
+                        kml += `      <LineString>\n        <coordinates>\n          `;
+                        kml += item.layer.getLatLngs().map(latlng => `${latlng.lng},${latlng.lat},0`).join(' ');
+                        kml += `\n        </coordinates>\n      </LineString>\n`;
+                    }
+                    kml += `    </Placemark>\n`;
+                });
+                kml += `  </Document>\n</kml>`;
+                return kml;
+            }
             
-            // --- DÉMARRAGE DE L'APPLICATION ---
+            // --- Lancement de l'app ---
+            const savedMode = localStorage.getItem('mapMode');
+            setMapMode(savedMode === 'online'); // Active le mode offline par défaut si rien n'est sauvegardé
             loadData();
         });
     </script>
