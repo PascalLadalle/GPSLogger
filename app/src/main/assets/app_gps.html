@@ -81,7 +81,7 @@
 
             const imageBounds = [[8.466, -71.678], [8.485, -71.651]];
             let onlineTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri', className: 'map-layer-online' });
-            let offlineImageLayer = L.imageOverlay('map_background.png', imageBounds, { className: 'map-layer-offline' });
+            let offlineImageLayer = L.imageOverlay('map_background.jpg', imageBounds, { className: 'map-layer-offline' });
             
             const mapToggle = document.getElementById('map-toggle');
             const toggleRecordBtn = document.getElementById('toggle-record');
@@ -266,3 +266,4 @@
 </html>
 
     
+
