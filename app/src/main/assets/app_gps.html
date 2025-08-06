@@ -38,12 +38,11 @@
         #item-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
         #item-list li { padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
         #item-list .item-name { flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 10px; }
-        /* --- MODIFICATION : Style pour le champ de nom quand il est modifiable --- */
         #item-list .item-name[contenteditable="true"] { background-color: #f0f8ff; box-shadow: inset 0 0 2px #007bff; outline: none; padding: 2px 5px; }
         #item-list .item-actions { display: flex; gap: 8px; }
         #item-list .item-actions button { padding: 5px 10px; border: none; border-radius: 5px; color: white; cursor: pointer; font-size: 14px; }
         .rename-btn { background-color: #007BFF; }
-        .save-btn { background-color: #28a745; } /* Style pour le bouton "Sauvegarder" */
+        .save-btn { background-color: #28a745; }
         .delete-btn { background-color: #dc3545; }
         #menu-footer { padding: 20px; border-top: 1px solid #ddd; background-color: #f8f9fa; }
         #delete-all { width: 100%; padding: 15px; background-color: #dc3545; color: white; border: none; cursor: pointer; font-size: 16px; margin-top: 15px; }
@@ -166,7 +165,14 @@
                     if (!map.zoomControl) map.zoomControl = L.control.zoom({position: 'topleft'}).addTo(map);
                 } else {
                     offlineImageLayer.addTo(map);
-                    map.fitBounds(imageBounds);
+                    // Ancien comportement qui montrait toute l'image : map.fitBounds(imageBounds);
+                    
+                    // --- MODIFICATION DÉBUT : Zoom automatique sur un point précis ---
+                    // Au lieu d'afficher toute l'image, la carte est maintenant centrée
+                    // sur le point spécifié avec un niveau de zoom de 20.
+                    map.setView([8.477813695061739, -71.66403125361201], 20);
+                    // --- MODIFICATION FIN ---
+                    
                     if (map.zoomControl) { map.removeControl(map.zoomControl); map.zoomControl = null; }
                 }
                 localStorage.setItem('mapMode', isOnline ? 'online' : 'offline');
@@ -259,22 +265,17 @@
                 if (recordedItems.length === 0) {
                     return showNotification('No hay nada que borrar.', 'error');
                 }
-                // --- MODIFICATION DÉBUT : Suppression de la confirmation ---
-                // La fonction confirm() est souvent bloquée dans les WebViews Android.
-                // Nous la retirons pour assurer le fonctionnement du bouton.
-                // if (confirm('¿Estás seguro de que quieres borrar todos los elementos?')) {
-                    recordedItems.forEach(item => {
-                        if (item.layer && map.hasLayer(item.layer)) {
-                            map.removeLayer(item.layer);
-                        }
-                    });
-                    recordedItems = [];
-                    itemIdCounter = 0;
-                    updateItemList();
-                    saveData();
-                    showNotification('Todos los elementos han sido borrados.');
-                // }
-                // --- MODIFICATION FIN ---
+                // La fonction confirm() a été retirée car elle est souvent bloquée dans les WebViews.
+                recordedItems.forEach(item => {
+                    if (item.layer && map.hasLayer(item.layer)) {
+                        map.removeLayer(item.layer);
+                    }
+                });
+                recordedItems = [];
+                itemIdCounter = 0;
+                updateItemList();
+                saveData();
+                showNotification('Todos los elementos han sido borrados.');
             });
 
             function saveData() {
@@ -326,12 +327,11 @@
             
             function showNotification(message, type = 'success') { const notif = document.createElement('div'); notif.className = `toast-notification ${type}`; notif.textContent = message; notificationContainer.appendChild(notif); requestAnimationFrame(() => notif.classList.add('show')); setTimeout(() => { notif.classList.remove('show'); notif.addEventListener('transitionend', () => notif.remove(), { once: true }); }, 3500); }
             
-            // --- MODIFICATION DÉBUT : La fonction updateItemList est modifiée pour gérer la nouvelle logique de renommage ---
             function updateItemList() {
                 itemList.innerHTML = '';
                 recordedItems.forEach(item => {
                     const li = document.createElement('li');
-                    li.dataset.itemId = item.id; // Ajout d'un identifiant à l'élément de la liste
+                    li.dataset.itemId = item.id;
 
                     const nameSpan = document.createElement('span');
                     nameSpan.className = 'item-name';
@@ -341,12 +341,12 @@
                     actionsDiv.className = 'item-actions';
                     
                     const renameBtn = document.createElement('button');
-                    renameBtn.innerHTML = '✏️'; // Utilisation d'innerHTML pour les emojis
+                    renameBtn.innerHTML = '✏️';
                     renameBtn.className = 'rename-btn';
                     renameBtn.title = 'Renombrar';
                     
                     const deleteBtn = document.createElement('button');
-                    deleteBtn.innerHTML = '🗑️'; // Utilisation d'innerHTML pour les emojis
+                    deleteBtn.innerHTML = '🗑️';
                     deleteBtn.className = 'delete-btn';
                     deleteBtn.title = 'Borrar';
 
@@ -358,12 +358,10 @@
                 });
             }
 
-            // --- MODIFICATION DÉBUT : Ajout d'un gestionnaire d'événements centralisé pour la liste ---
-            // C'est une méthode plus robuste que d'ajouter un 'onclick' sur chaque bouton dans la boucle.
-            // Elle gère les clics sur les boutons de renommage et de suppression.
+            // Gestionnaire d'événements centralisé pour les actions sur la liste (renommer, supprimer)
             itemList.addEventListener('click', function(e) {
                 const button = e.target.closest('button');
-                if (!button) return; // Si le clic n'est pas sur un bouton, on ne fait rien
+                if (!button) return;
 
                 const li = e.target.closest('li');
                 const itemId = li.dataset.itemId;
@@ -371,28 +369,22 @@
                 if (!item) return;
 
                 const nameSpan = li.querySelector('.item-name');
-                const renameBtn = li.querySelector('.rename-btn');
-
-                // Logique pour le bouton de suppression individuel
+                
                 if (button.classList.contains('delete-btn')) {
                     map.removeLayer(item.layer);
                     recordedItems = recordedItems.filter(i => i.id !== item.id);
-                    updateItemList(); // On reconstruit la liste pour la propreté
+                    updateItemList();
                     saveData();
                     showNotification(`'${item.name}' ha sido borrado.`);
                 }
-
-                // Logique pour le bouton de renommage
-                if (button.classList.contains('rename-btn')) {
-                    // Rend le champ de nom modifiable et change le bouton en "Sauvegarder"
+                else if (button.classList.contains('rename-btn')) {
                     nameSpan.contentEditable = true;
-                    nameSpan.focus(); // Met le focus sur le champ pour modification immédiate
-                    button.innerHTML = '💾'; // Emoji de sauvegarde
+                    nameSpan.focus();
+                    button.innerHTML = '💾';
                     button.classList.remove('rename-btn');
                     button.classList.add('save-btn');
                     button.title = 'Guardar';
                 } 
-                // Logique pour le bouton de sauvegarde (anciennement renommage)
                 else if (button.classList.contains('save-btn')) {
                     const newName = nameSpan.textContent.trim();
                     if (newName) {
@@ -405,15 +397,13 @@
                         saveData();
                         showNotification('Elemento renombrado.');
                     }
-                    // Rétablit l'état initial non-modifiable
                     nameSpan.contentEditable = false;
-                    button.innerHTML = '✏️'; // Emoji crayon
+                    button.innerHTML = '✏️';
                     button.classList.remove('save-btn');
                     button.classList.add('rename-btn');
                     button.title = 'Renombrar';
                 }
             });
-            // --- MODIFICATION FIN ---
 
             function openMenu() { menu.classList.add('open'); mapOverlay.classList.add('visible'); }
             function closeMenu() { menu.classList.remove('open'); mapOverlay.classList.remove('visible'); }
