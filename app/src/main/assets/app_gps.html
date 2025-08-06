@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Geo Tracker</title>
+    <!-- Le nom de l'application est mis à jour dans le titre de l'onglet -->
+    <title>GPSLogger</title>
     
     <link rel="stylesheet" href="./leaflet.css" />
 
@@ -85,19 +86,30 @@
             
             // --- SECTION 1 : INITIALISATION ---
 
-            const map = L.map('map', { zoomControl: false });
+            // MODIFIÉ : Ajout de maxZoom pour autoriser un zoom plus profond sur la carte
+            const map = L.map('map', { 
+                zoomControl: false,
+                maxZoom: 19 
+            });
+
+            // Variables d'état pour suivre l'application
             let directionMarker, accuracyCircle, isRecording = false;
             let currentTrack;
             let recordedItems = [], itemIdCounter = 0;
-
-            // Constante pour la simplification. Augmentez pour plus de simplification (moins de points),
-            // diminuez pour plus de détails (plus de points).
             const simplificationTolerance = 5; 
 
+            // Définition des couches de carte
             const imageBounds = [[8.466, -71.678], [8.485, -71.651]];
-            let onlineTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri', className: 'map-layer-online' });
+            
+            // MODIFIÉ : Ajout de maxZoom pour obtenir les tuiles de plus haute résolution
+            let onlineTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
+                attribution: 'Esri', 
+                className: 'map-layer-online',
+                maxZoom: 19 
+            });
             let offlineImageLayer = L.imageOverlay('map_background.jpg', imageBounds, { className: 'map-layer-offline' });
             
+            // Références aux éléments du DOM
             const mapToggle = document.getElementById('map-toggle');
             const toggleRecordBtn = document.getElementById('toggle-record');
             const addPointBtn = document.getElementById('add-point');
@@ -168,7 +180,6 @@
                 mapToggle.checked = isOnline;
             }
 
-            // Attache la fonction au clic sur le bouton toggle
             mapToggle.addEventListener('change', function() { setMapMode(this.checked); });
             
 
@@ -181,32 +192,25 @@
                 this.style.backgroundColor = isRecording ? '#dc3545' : '#007BFF';
 
                 if (isRecording) {
-                    // Si on démarre l'enregistrement
                     if (directionMarker) { map.flyTo(directionMarker.getLatLng(), 18); }
                     startNewTrack();
                     showNotification('Grabación iniciada.');
                 } else {
-                    // Si on arrête l'enregistrement
                     const trackToFinalize = currentTrack;
                     currentTrack = null; 
                     
                     if (trackToFinalize && trackToFinalize.getLatLngs().length > 2) {
                         let points = trackToFinalize.getLatLngs();
-                        
-                        // --- SIMPLIFICATION DU TRACÉ ---
                         const simplifiedPoints = L.LineUtil.simplify(points, simplificationTolerance);
                         trackToFinalize.setLatLngs(simplifiedPoints);
                         
-                        // On re-récupère les points simplifiés pour la logique de fermeture
                         points = trackToFinalize.getLatLngs();
                         const firstPoint = points[0];
                         const lastPoint = points[points.length - 1];
                         
-                        // Si le parcours se termine près de son point de départ, on le ferme
                         if (firstPoint.distanceTo(lastPoint) < 5) {
                             points.push(firstPoint);
                             trackToFinalize.setLatLngs(points);
-                            // On remplace la ligne par un polygone visuel
                             const polygon = L.polygon(points, {color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2}).addTo(map);
                             const oldTrackItem = recordedItems.find(item => item.layer === trackToFinalize);
                             if(oldTrackItem) oldTrackItem.layer = polygon;
@@ -214,13 +218,12 @@
                         }
                         showNotification('Recorrido finalizado y simplificado.');
                     } else if (trackToFinalize) {
-                        // Si le parcours est trop court, on le supprime
                         const itemToRemove = recordedItems.pop();
                         if (itemToRemove) map.removeLayer(itemToRemove.layer);
                         updateItemList();
                         showNotification('Grabación detenida. Recorrido demasiado corto.', 'error');
                     }
-                    saveData(); // On sauvegarde dans tous les cas
+                    saveData();
                 }
             });
 
@@ -285,7 +288,7 @@
                 }
             });
 
-            // Génère le contenu du fichier KML selon le format spécifié
+            // Génère le contenu du fichier KML
             function generateKML() {
                 let kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n    <name>Datos del mapa interactivo</name>\n    <description>Exportado desde la aplicación web</description>\n`;
                 recordedItems.forEach(item => {
