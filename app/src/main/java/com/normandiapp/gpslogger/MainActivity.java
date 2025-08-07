@@ -31,7 +31,12 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
     private WebView webView;
     private LocationManager locationManager;
     private SensorManager sensorManager;
-    private Sensor orientationSensor;
+    
+    // --- MODIFICATION 1/3 : Remplacement du capteur obsolète ---
+    private Sensor rotationVectorSensor;
+    private final float[] rotationMatrix = new float[9];
+    private final float[] orientationAngles = new float[3];
+    // --- FIN MODIFICATION ---
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,15 +48,15 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
         webView.getSettings().setJavaScriptEnabled(true);
         webView.getSettings().setDomStorageEnabled(true);
 
-        // --- PONT JAVASCRIPT ---
         webView.addJavascriptInterface(new WebAppInterface(this), "Android");
         webView.loadUrl("file:///android_asset/app_gps.html");
 
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        
-        // Utilisation du capteur d'orientation original
-        orientationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION);
+
+        // --- MODIFICATION 2/3 : On récupère le capteur moderne ---
+        rotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+        // --- FIN MODIFICATION ---
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
@@ -60,14 +65,10 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
         }
     }
 
-    // Classe interne qui contient les méthodes accessibles depuis le JavaScript
+    // Le code du partage de fichier est le vôtre, il est correct et ne change pas.
     public class WebAppInterface {
         Context mContext;
-
-        WebAppInterface(Context c) {
-            mContext = c;
-        }
-
+        WebAppInterface(Context c) { mContext = c; }
         @JavascriptInterface
         public void shareKml(String kmlContent, String fileName) {
             try {
@@ -77,9 +78,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
                 FileOutputStream stream = new FileOutputStream(file);
                 stream.write(kmlContent.getBytes());
                 stream.close();
-
                 Uri contentUri = FileProvider.getUriForFile(mContext, "com.normandiapp.gpslogger.provider", file);
-
                 if (contentUri != null) {
                     Intent shareIntent = new Intent();
                     shareIntent.setAction(Intent.ACTION_SEND);
@@ -105,19 +104,23 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
         final double lat = location.getLatitude();
         final double lng = location.getLongitude();
         final float accuracy = location.getAccuracy();
-        // Utilisation de Locale.US pour s'assurer que le point décimal est un "."
         String script = String.format(Locale.US, "javascript:updatePositionFromNative(%f, %f, %f);", lat, lng, accuracy);
         webView.post(() -> webView.evaluateJavascript(script, null));
     }
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        // La logique pour la rotation du curseur est déjà ici et correcte.
-        if (event.sensor.getType() == Sensor.TYPE_ORIENTATION) {
-            final float heading = event.values[0];
+        // --- MODIFICATION 3/3 : Logique pour interpréter le capteur moderne ---
+        if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
+            // Convertir le vecteur de rotation en matrice
+            SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values);
+            // Obtenir l'orientation (azimut/heading) en degrés
+            final float heading = (float) Math.toDegrees(SensorManager.getOrientation(rotationMatrix, orientationAngles)[0]);
+            
             String script = String.format(Locale.US, "javascript:updateHeadingFromNative(%f);", heading);
             webView.post(() -> webView.evaluateJavascript(script, null));
         }
+        // --- FIN MODIFICATION ---
     }
 
     @Override
@@ -134,14 +137,15 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
     @Override
     protected void onResume() {
         super.onResume();
-        // On enregistre l'écouteur pour l'orientation ici
-        sensorManager.registerListener(this, orientationSensor, SensorManager.SENSOR_DELAY_UI);
+        // On enregistre l'écouteur pour le nouveau capteur
+        if (rotationVectorSensor != null) {
+            sensorManager.registerListener(this, rotationVectorSensor, SensorManager.SENSOR_DELAY_UI);
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        // On arrête les écouteurs pour économiser la batterie
         locationManager.removeUpdates(this);
         sensorManager.unregisterListener(this);
     }
