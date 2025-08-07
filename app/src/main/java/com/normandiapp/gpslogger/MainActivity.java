@@ -52,10 +52,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
         webview.getSettings().setAllowFileAccess(true);
 
         webview.addJavascriptInterface(new WebAppInterface(this), "Android");
-
-        // CORRECTION FINALE : Utilisation du nom de fichier correct "app_gps.html"
         webview.loadUrl("file:///android_asset/app_gps.html");
-
         checkLocationPermission();
     }
 
@@ -74,7 +71,10 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
                 outputStream.write(kmlContent.getBytes());
                 outputStream.close();
 
-                Uri fileUri = FileProvider.getUriForFile(mContext, "com.normandiapp.gpslogger.provider", kmlFile);
+                // --- LA CORRECTION EST ICI ---
+                // On utilise la méthode dynamique originale pour obtenir l'autorité,
+                // ce qui garantit la correspondance avec AndroidManifest.xml.
+                Uri fileUri = FileProvider.getUriForFile(mContext, mContext.getApplicationContext().getPackageName() + ".provider", kmlFile);
 
                 Intent shareIntent = new Intent(Intent.ACTION_SEND);
                 shareIntent.setType("application/vnd.google-earth.kml+xml");
