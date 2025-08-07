@@ -47,9 +47,24 @@
         #menu-footer { padding: 20px; border-top: 1px solid #ddd; background-color: #f8f9fa; }
         #delete-all { width: 100%; padding: 15px; background-color: #dc3545; color: white; border: none; cursor: pointer; font-size: 16px; margin-top: 15px; }
         
-        /* --- Icônes et Toggles --- */
-        .direction-arrow { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 25px solid #007BFF; transition: transform 0.2s linear; transform-origin: center 15px; }
-        .direction-accuracy { background-color: rgba(0, 123, 255, 0.1); border-radius: 50%; border: 1px solid #007BFF; }
+        /* --- NOUVEAU STYLE POUR LA FLÈCHE DE DIRECTION --- */
+        .direction-arrow {
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;   /* Largeur de la base */
+            border-right: 8px solid transparent;  /* Largeur de la base */
+            border-bottom: 22px solid #FF4136; /* Hauteur et couleur de la flèche */
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4)); /* Ombre portée */
+            transition: transform 0.2s linear; /* Rotation fluide */
+            transform-origin: center 16px;      /* Point de pivot */
+        }
+        .direction-accuracy {
+            background-color: rgba(255, 65, 54, 0.1);
+            border-radius: 50%;
+            border: 1px solid #FF4136;
+        }
+
+        /* --- Style pour le toggle --- */
         .toggle-container { display: flex; align-items: center; justify-content: space-around; font-size: 14px;}
         .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
         .switch input { opacity: 0; width: 0; height: 0; }
@@ -92,11 +107,11 @@
                 maxZoom: 21 
             });
 
-            let directionMarker, accuracyCircle, isRecording = false;
+            // Variable renommée pour plus de clarté
+            let userPositionMarker, accuracyCircle, isRecording = false;
             let currentTrack;
             let recordedItems = [], itemIdCounter = 0;
-
-            const minDistanceBetweenPoints = 2; // En mètres.
+            const minDistanceBetweenPoints = 2;
 
             const imageBounds = [[8.468908, -71.669649], [8.480803, -71.657762]];
             let onlineTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
@@ -129,14 +144,15 @@
 
             // --- SECTION 2 : "PONT" NATIF <-> WEB ---
 
+            // Appelée par Android à chaque nouvelle position GPS
             window.updatePositionFromNative = function(lat, lng, accuracy) {
                 const newLatLng = L.latLng(lat, lng);
-                if (!directionMarker) {
-                    const arrowIcon = L.divIcon({ className: 'direction-arrow', iconSize: [20, 25], iconAnchor: [10, 25] });
-                    directionMarker = L.marker(newLatLng, { icon: arrowIcon }).addTo(map);
+                if (!userPositionMarker) {
+                    const arrowIcon = L.divIcon({ className: 'direction-arrow', iconSize: [16, 22], iconAnchor: [8, 22] });
+                    userPositionMarker = L.marker(newLatLng, { icon: arrowIcon }).addTo(map);
                     accuracyCircle = L.circle(newLatLng, { radius: accuracy, className: 'direction-accuracy' }).addTo(map);
                 } else {
-                    directionMarker.setLatLng(newLatLng);
+                    userPositionMarker.setLatLng(newLatLng);
                     accuracyCircle.setLatLng(newLatLng).setRadius(accuracy);
                 }
                 if (isRecording && currentTrack) {
@@ -152,9 +168,10 @@
                 }
             };
 
+            // Appelée par Android à chaque changement d'orientation
             window.updateHeadingFromNative = function(heading) {
-                if (directionMarker && directionMarker.getElement()) {
-                    directionMarker.getElement().style.transform = `rotate(${heading}deg)`;
+                if (userPositionMarker && userPositionMarker.getElement()) {
+                    userPositionMarker.getElement().style.transform = `rotate(${heading}deg)`;
                 }
             };
 
@@ -168,12 +185,10 @@
                 if (!map.zoomControl) {
                     map.zoomControl = L.control.zoom({position: 'topleft'}).addTo(map);
                 }
-
                 if (isOnline) {
                     onlineTileLayer.addTo(map);
                 } else {
                     offlineImageLayer.addTo(map);
-                    // On centre la carte sur le point précis demandé au démarrage en mode offline
                     map.setView([8.477834923197527, -71.66402593560836], 20);
                 }
                 localStorage.setItem('mapMode', isOnline ? 'online' : 'offline');
@@ -190,7 +205,7 @@
                 this.style.backgroundColor = isRecording ? '#dc3545' : '#007BFF';
 
                 if (isRecording) {
-                    if (directionMarker) { map.flyTo(directionMarker.getLatLng(), 18); }
+                    if (userPositionMarker) { map.flyTo(userPositionMarker.getLatLng(), 18); }
                     startNewTrack();
                     showNotification('Grabación iniciada.');
                 } else {
@@ -225,6 +240,7 @@
                 }
             });
 
+            // VOTRE NOUVELLE FONCTION DE SIMPLIFICATION
             function intelligentSimplify(points) {
                 if (points.length < 3) return points;
                 const tolerances = [20, 10, 5, 3, 2, 1]; 
@@ -248,11 +264,11 @@
             }
             
             addPointBtn.addEventListener('click', function() {
-                if (!directionMarker) return showNotification('Posición no encontrada.', 'error');
-                map.flyTo(directionMarker.getLatLng(), 18);
+                if (!userPositionMarker) return showNotification('Posición no encontrada.', 'error');
+                map.flyTo(userPositionMarker.getLatLng(), 18);
                 const id = `point-${++itemIdCounter}`;
                 const pointName = `Punto ${itemIdCounter}`;
-                const latlng = directionMarker.getLatLng();
+                const latlng = userPositionMarker.getLatLng();
                 const point = L.marker(latlng).addTo(map).bindPopup(pointName);
                 recordedItems.push({ id, name: pointName, type: 'point', layer: point });
                 updateItemList();
@@ -281,7 +297,7 @@
                 }
             });
 
-            function saveData() { const savableItems = recordedItems.map(item => { const data = { id: item.id, name: item.name, type: item.type }; let coords; if (item.type === 'point' && item.layer && typeof item.layer.getLatLng === 'function') { data.coords = item.layer.getLatLng(); } else if (item.type === 'track' && item.layer && typeof item.layer.getLatLngs === 'function') { data.coords = item.layer.getLatLngs(); } return data; }); localStorage.setItem('geoTrackerData', JSON.stringify(savableItems)); }
+            function saveData() { const savableItems = recordedItems.map(item => { const data = { id: item.id, name: item.name, type: item.type, coords: null }; if (item.type === 'point' && item.layer && typeof item.layer.getLatLng === 'function') { data.coords = item.layer.getLatLng(); } else if (item.type === 'track' && item.layer && typeof item.layer.getLatLngs === 'function') { data.coords = item.layer.getLatLngs(); } return data; }); localStorage.setItem('geoTrackerData', JSON.stringify(savableItems)); }
             function loadData() { const savedData = localStorage.getItem('geoTrackerData'); if (!savedData) return; try { const parsedItems = JSON.parse(savedData); let maxId = 0; parsedItems.forEach(savedItem => { let layer = null; if (!savedItem.coords) return; if (savedItem.type === 'point' && savedItem.coords.lat != null && savedItem.coords.lng != null) { layer = L.marker(savedItem.coords).addTo(map).bindPopup(savedItem.name); } else if (savedItem.type === 'track' && Array.isArray(savedItem.coords)) { const points = savedItem.coords.map(c => L.latLng(c.lat, c.lng)); if (points.length === 0) return; if (points.length > 2 && points[0].equals(points[points.length - 1])) { layer = L.polygon(points, { color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2 }).addTo(map); } else { layer = L.polyline(points, { color: 'red', weight: 4 }).addTo(map); } } if (layer) { recordedItems.push({ id: savedItem.id, name: savedItem.name, type: savedItem.type, layer: layer }); const idNum = parseInt(savedItem.id.split('-')[1]); if (idNum > maxId) maxId = idNum; } }); itemIdCounter = maxId; updateItemList(); } catch (e) { console.error("Erreur lors du chargement des données locales :", e); localStorage.removeItem('geoTrackerData'); } }
             function showNotification(message, type = 'success') { const notif = document.createElement('div'); notif.className = `toast-notification ${type}`; notif.textContent = message; notificationContainer.appendChild(notif); requestAnimationFrame(() => notif.classList.add('show')); setTimeout(() => { notif.classList.remove('show'); notif.addEventListener('transitionend', () => notif.remove(), { once: true }); }, 3500); }
             function updateItemList() { itemList.innerHTML = ''; recordedItems.forEach(item => { const li = document.createElement('li'); li.dataset.itemId = item.id; const nameSpan = document.createElement('span'); nameSpan.className = 'item-name'; nameSpan.textContent = item.name; const actionsDiv = document.createElement('div'); actionsDiv.className = 'item-actions'; const renameBtn = document.createElement('button'); renameBtn.innerHTML = '✏️'; renameBtn.className = 'rename-btn'; renameBtn.title = 'Renombrar'; const deleteBtn = document.createElement('button'); deleteBtn.innerHTML = '🗑️'; deleteBtn.className = 'delete-btn'; deleteBtn.title = 'Borrar'; actionsDiv.appendChild(renameBtn); actionsDiv.appendChild(deleteBtn); li.appendChild(nameSpan); li.appendChild(actionsDiv); itemList.appendChild(li); }); }
@@ -386,4 +402,3 @@
     </script>
 </body>
 </html>
-
