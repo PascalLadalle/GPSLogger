@@ -171,6 +171,7 @@
                     const container = userPositionMarker.getElement();
                     const arrow = container.querySelector('.direction-arrow');
                     if (arrow) {
+                        // LA LIGNE CORRIGÉE EST ICI :
                         arrow.style.transform = `rotate(${heading}deg)`;
                     }
                 }
@@ -244,7 +245,6 @@
             }
 
             function startNewTrack() { const id = `track-${++itemIdCounter}`; const trackName = `Recorrido ${itemIdCounter}`; currentTrack = L.polyline([], { color: 'red', weight: 4 }).addTo(map); recordedItems.push({ id, name: trackName, type: 'track', layer: currentTrack }); updateItemList(); }
-            
             addPointBtn.addEventListener('click', function() { if (!userPositionMarker) return showNotification('Posición no encontrada.', 'error'); map.flyTo(userPositionMarker.getLatLng(), 18); const id = `point-${++itemIdCounter}`; const pointName = `Punto ${itemIdCounter}`; const latlng = userPositionMarker.getLatLng(); const point = L.marker(latlng).addTo(map).bindPopup(pointName); recordedItems.push({ id, name: pointName, type: 'point', layer: point }); updateItemList(); saveData(); showNotification(`Nuevo punto creado: ${pointName}`); });
 
             
@@ -254,7 +254,7 @@
                 if (recordedItems.length === 0) {
                     return showNotification('No hay nada que borrar.', 'error');
                 }
-                // Suppression de la boîte de dialogue confirm() pour la compatibilité WebView
+                // Suppression de confirm() pour la compatibilité
                 recordedItems.forEach(item => {
                     if (item.layer && map.hasLayer(item.layer)) {
                         map.removeLayer(item.layer);
@@ -267,121 +267,12 @@
                 showNotification('Todos los elementos han sido borrados.');
             });
             
-            function saveData() {
-                const savableItems = recordedItems.map(item => {
-                    const data = { id: item.id, name: item.name, type: item.type, coords: null };
-                    if (item.type === 'point' && item.layer && typeof item.layer.getLatLng === 'function') {
-                        data.coords = item.layer.getLatLng();
-                    } else if (item.type === 'track' && item.layer && typeof item.layer.getLatLngs === 'function') {
-                        data.coords = item.layer.getLatLngs();
-                    }
-                    return data;
-                });
-                localStorage.setItem('geoTrackerData', JSON.stringify(savableItems));
-            }
-            
-            function loadData() {
-                const savedData = localStorage.getItem('geoTrackerData');
-                if (!savedData) return;
-                try {
-                    const parsedItems = JSON.parse(savedData);
-                    let maxId = 0;
-                    parsedItems.forEach(savedItem => {
-                        let layer = null;
-                        if (!savedItem.coords) return;
-                        if (savedItem.type === 'point' && savedItem.coords.lat != null && savedItem.coords.lng != null) {
-                            layer = L.marker(savedItem.coords).addTo(map).bindPopup(savedItem.name);
-                        } else if (savedItem.type === 'track' && Array.isArray(savedItem.coords)) {
-                            const points = savedItem.coords.map(c => L.latLng(c.lat, c.lng));
-                            if (points.length === 0) return;
-                            if (points.length > 2 && points[0].equals(points[points.length - 1])) {
-                                layer = L.polygon(points, { color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2 }).addTo(map);
-                            } else {
-                                layer = L.polyline(points, { color: 'red', weight: 4 }).addTo(map);
-                            }
-                        }
-                        if (layer) {
-                            recordedItems.push({ id: savedItem.id, name: savedItem.name, type: savedItem.type, layer: layer });
-                            const idNum = parseInt(savedItem.id.split('-')[1]);
-                            if (idNum > maxId) maxId = idNum;
-                        }
-                    });
-                    itemIdCounter = maxId;
-                    updateItemList();
-                } catch (e) {
-                    console.error("Erreur lors du chargement des données locales :", e);
-                    localStorage.removeItem('geoTrackerData');
-                }
-            }
-            
+            function saveData() { const savableItems = recordedItems.map(item => { const data = { id: item.id, name: item.name, type: item.type, coords: null }; if (item.type === 'point' && item.layer && typeof item.layer.getLatLng === 'function') { data.coords = item.layer.getLatLng(); } else if (item.type === 'track' && item.layer && typeof item.layer.getLatLngs === 'function') { data.coords = item.layer.getLatLngs(); } return data; }); localStorage.setItem('geoTrackerData', JSON.stringify(savableItems)); }
+            function loadData() { const savedData = localStorage.getItem('geoTrackerData'); if (!savedData) return; try { const parsedItems = JSON.parse(savedData); let maxId = 0; parsedItems.forEach(savedItem => { let layer = null; if (!savedItem.coords) return; if (savedItem.type === 'point' && savedItem.coords.lat != null && savedItem.coords.lng != null) { layer = L.marker(savedItem.coords).addTo(map).bindPopup(savedItem.name); } else if (savedItem.type === 'track' && Array.isArray(savedItem.coords)) { const points = savedItem.coords.map(c => L.latLng(c.lat, c.lng)); if (points.length === 0) return; if (points.length > 2 && points[0].equals(points[points.length - 1])) { layer = L.polygon(points, { color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2 }).addTo(map); } else { layer = L.polyline(points, { color: 'red', weight: 4 }).addTo(map); } } if (layer) { recordedItems.push({ id: savedItem.id, name: savedItem.name, type: savedItem.type, layer: layer }); const idNum = parseInt(savedItem.id.split('-')[1]); if (idNum > maxId) maxId = idNum; } }); itemIdCounter = maxId; updateItemList(); } catch (e) { console.error("Erreur lors du chargement des données locales :", e); localStorage.removeItem('geoTrackerData'); } }
             function showNotification(message, type = 'success') { const notif = document.createElement('div'); notif.className = `toast-notification ${type}`; notif.textContent = message; notificationContainer.appendChild(notif); requestAnimationFrame(() => notif.classList.add('show')); setTimeout(() => { notif.classList.remove('show'); notif.addEventListener('transitionend', () => notif.remove(), { once: true }); }, 3500); }
+            function updateItemList() { itemList.innerHTML = ''; recordedItems.forEach(item => { const li = document.createElement('li'); li.dataset.itemId = item.id; const nameSpan = document.createElement('span'); nameSpan.className = 'item-name'; nameSpan.textContent = item.name; const actionsDiv = document.createElement('div'); actionsDiv.className = 'item-actions'; const renameBtn = document.createElement('button'); renameBtn.innerHTML = '✏️'; renameBtn.className = 'rename-btn'; renameBtn.title = 'Renombrar'; const deleteBtn = document.createElement('button'); deleteBtn.innerHTML = '🗑️'; deleteBtn.className = 'delete-btn'; deleteBtn.title = 'Borrar'; actionsDiv.appendChild(renameBtn); actionsDiv.appendChild(deleteBtn); li.appendChild(nameSpan); li.appendChild(actionsDiv); itemList.appendChild(li); }); }
             
-            function updateItemList() {
-                itemList.innerHTML = '';
-                recordedItems.forEach(item => {
-                    const li = document.createElement('li');
-                    li.dataset.itemId = item.id;
-                    const nameSpan = document.createElement('span');
-                    nameSpan.className = 'item-name';
-                    nameSpan.textContent = item.name;
-                    const actionsDiv = document.createElement('div');
-                    actionsDiv.className = 'item-actions';
-                    const renameBtn = document.createElement('button');
-                    renameBtn.innerHTML = '✏️';
-                    renameBtn.className = 'rename-btn';
-                    renameBtn.title = 'Renombrar';
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.innerHTML = '🗑️';
-                    deleteBtn.className = 'delete-btn';
-                    deleteBtn.title = 'Borrar';
-                    actionsDiv.appendChild(renameBtn);
-                    actionsDiv.appendChild(deleteBtn);
-                    li.appendChild(nameSpan);
-                    li.appendChild(actionsDiv);
-                    itemList.appendChild(li);
-                });
-            }
-            
-            itemList.addEventListener('click', function(e) {
-                const button = e.target.closest('button');
-                if (!button) return;
-                const li = e.target.closest('li');
-                const itemId = li.dataset.itemId;
-                const item = recordedItems.find(i => i.id === itemId);
-                if (!item) return;
-                const nameSpan = li.querySelector('.item-name');
-                if (button.classList.contains('delete-btn')) {
-                    map.removeLayer(item.layer);
-                    recordedItems = recordedItems.filter(i => i.id !== item.id);
-                    updateItemList();
-                    saveData();
-                    showNotification(`'${item.name}' ha sido borrado.`);
-                } else if (button.classList.contains('rename-btn')) {
-                    nameSpan.contentEditable = true;
-                    nameSpan.focus();
-                    button.innerHTML = '💾';
-                    button.classList.remove('rename-btn');
-                    button.classList.add('save-btn');
-                    button.title = 'Guardar';
-                } else if (button.classList.contains('save-btn')) {
-                    const newName = nameSpan.textContent.trim();
-                    if (newName) {
-                        item.name = newName;
-                        if (item.layer.getPopup()) {
-                            item.layer.setPopupContent(item.name);
-                        } else {
-                            item.layer.bindPopup(item.name);
-                        }
-                        saveData();
-                        showNotification('Elemento renombrado.');
-                    }
-                    nameSpan.contentEditable = false;
-                    button.innerHTML = '✏️';
-                    button.classList.remove('save-btn');
-                    button.classList.add('rename-btn');
-                    button.title = 'Renombrar';
-                }
-            });
+            itemList.addEventListener('click', function(e) { const button = e.target.closest('button'); if (!button) return; const li = e.target.closest('li'); const itemId = li.dataset.itemId; const item = recordedItems.find(i => i.id === itemId); if (!item) return; const nameSpan = li.querySelector('.item-name'); if (button.classList.contains('delete-btn')) { map.removeLayer(item.layer); recordedItems = recordedItems.filter(i => i.id !== item.id); updateItemList(); saveData(); showNotification(`'${item.name}' ha sido borrado.`); } else if (button.classList.contains('rename-btn')) { nameSpan.contentEditable = true; nameSpan.focus(); button.innerHTML = '💾'; button.classList.remove('rename-btn'); button.classList.add('save-btn'); button.title = 'Guardar'; } else if (button.classList.contains('save-btn')) { const newName = nameSpan.textContent.trim(); if (newName) { item.name = newName; if (item.layer.getPopup()) { item.layer.setPopupContent(item.name); } else { item.layer.bindPopup(item.name); } saveData(); showNotification('Elemento renombrado.'); } nameSpan.contentEditable = false; button.innerHTML = '✏️'; button.classList.remove('save-btn'); button.classList.add('rename-btn'); button.title = 'Renombrar'; } });
             
             function openMenu() { menu.classList.add('open'); mapOverlay.classList.add('visible'); }
             function closeMenu() { menu.classList.remove('open'); mapOverlay.classList.remove('visible'); }
