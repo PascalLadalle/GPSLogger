@@ -1,4 +1,4 @@
-package com.normandiapp.gpslogger; // <-- LA LIGNE CORRIGÉE EST ICI
+package com.normandiapp.gpslogger;
 
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -23,7 +23,6 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
     private WebView webview;
-    private WebAppInterface webAppInterface;
 
     // Variables pour les capteurs
     private LocationManager locationManager;
@@ -48,8 +47,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
         webview.getSettings().setDatabaseEnabled(true);
         webview.getSettings().setAllowFileAccess(true);
 
-        webAppInterface = new WebAppInterface(this);
-        webview.addJavascriptInterface(webAppInterface, "Android");
+        // La ligne "addJavascriptInterface" est volontairement retirée car WebAppInterface n'existe pas.
 
         webview.loadUrl("file:///android_asset/app_gps(2).html");
 
@@ -60,19 +58,15 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, LOCATION_PERMISSION_REQUEST_CODE);
         }
-        // Si la permission est déjà accordée, les capteurs seront démarrés dans onResume()
     }
 
     // Méthode pour démarrer l'écoute des capteurs
     private void startSensorUpdates() {
-        // Vérification de la permission (nécessaire car onResume peut être appelé avant la réponse)
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
-        // Démarrage du GPS
         locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 1, this);
 
-        // Démarrage du capteur d'orientation
         Sensor rotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
         if (rotationVectorSensor != null) {
             sensorManager.registerListener(this, rotationVectorSensor, SensorManager.SENSOR_DELAY_UI);
@@ -91,7 +85,6 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                 // La permission a été accordée, on peut démarrer les capteurs
                  startSensorUpdates();
             } else {
                 Toast.makeText(this, "La permission de localisation est nécessaire pour utiliser l'application.", Toast.LENGTH_LONG).show();
@@ -102,14 +95,12 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
     @Override
     protected void onResume() {
         super.onResume();
-        // On démarre les capteurs quand l'activité redevient visible
         startSensorUpdates();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        // On arrête les capteurs quand l'activité n'est plus visible pour économiser la batterie
         stopSensorUpdates();
     }
 
@@ -118,25 +109,21 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
 
     @Override
     public void onLocationChanged(@NonNull Location location) {
-        // La position a changé, on envoie les données au JavaScript
         webview.evaluateJavascript("javascript:updatePositionFromNative(" + location.getLatitude() + "," + location.getLongitude() + "," + location.getAccuracy() + ")", null);
     }
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        // L'orientation a changé
         if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
             SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values);
             float heading = (float) Math.toDegrees(SensorManager.getOrientation(rotationMatrix, orientationAngles)[0]);
-
-            // On envoie le cap (heading) au JavaScript
             webview.evaluateJavascript("javascript:updateHeadingFromNative(" + heading + ")", null);
         }
     }
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
-        // Non utilisé ici
+        // Non utilisé
     }
 
     // Méthodes requises par LocationListener
