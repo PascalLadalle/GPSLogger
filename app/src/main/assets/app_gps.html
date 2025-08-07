@@ -227,10 +227,11 @@
 
             function intelligentSimplify(points) {
                 if (points.length < 3) return points;
-                const tolerances = [10, 5, 3, 1]; 
+                const tolerances = [20, 10, 5, 3, 2, 1]; 
                 for (const tolerance of tolerances) {
                     const simplifiedPoints = L.LineUtil.simplify(points, tolerance);
-                    if (simplifiedPoints.length >= 3 && simplifiedPoints.length > points.length * 0.1) {
+                    if (simplifiedPoints.length >= 3 || simplifiedPoints.length > points.length * 0.1) {
+                        console.log(`Trazado simplificado con tolerancia de ${tolerance}m.`);
                         return simplifiedPoints;
                     }
                 }
@@ -385,3 +386,4 @@
     </script>
 </body>
 </html>
+
