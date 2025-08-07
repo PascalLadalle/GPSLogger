@@ -103,14 +103,23 @@
             
             // --- SECTION 1 : INITIALISATION ---
 
-            const map = L.map('map', { zoomControl: false, maxZoom: 21 });
+            const map = L.map('map', { 
+                zoomControl: false,
+                maxZoom: 21 
+            });
+
             let userPositionMarker, accuracyCircle, isRecording = false;
             let currentTrack;
             let recordedItems = [], itemIdCounter = 0;
             const minDistanceBetweenPoints = 2;
 
             const imageBounds = [[8.468908, -71.669649], [8.480803, -71.657762]];
-            let onlineTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri', className: 'map-layer-online', maxZoom: 21, maxNativeZoom: 18 });
+            let onlineTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
+                attribution: 'Esri', 
+                className: 'map-layer-online',
+                maxZoom: 21,
+                maxNativeZoom: 18 
+            });
             let offlineImageLayer = L.imageOverlay('map_background.jpg', imageBounds, { className: 'map-layer-offline' });
             
             const mapToggle = document.getElementById('map-toggle');
@@ -235,24 +244,196 @@
             }
 
             function startNewTrack() { const id = `track-${++itemIdCounter}`; const trackName = `Recorrido ${itemIdCounter}`; currentTrack = L.polyline([], { color: 'red', weight: 4 }).addTo(map); recordedItems.push({ id, name: trackName, type: 'track', layer: currentTrack }); updateItemList(); }
+            
             addPointBtn.addEventListener('click', function() { if (!userPositionMarker) return showNotification('Posición no encontrada.', 'error'); map.flyTo(userPositionMarker.getLatLng(), 18); const id = `point-${++itemIdCounter}`; const pointName = `Punto ${itemIdCounter}`; const latlng = userPositionMarker.getLatLng(); const point = L.marker(latlng).addTo(map).bindPopup(pointName); recordedItems.push({ id, name: pointName, type: 'point', layer: point }); updateItemList(); saveData(); showNotification(`Nuevo punto creado: ${pointName}`); });
 
             
             // --- SECTION 5 : GESTION DES DONNÉES ET DE L'INTERFACE ---
 
-            deleteAllBtn.addEventListener('click', function() { if (recordedItems.length === 0) { return showNotification('No hay nada que borrar.', 'error'); } if (confirm('¿Estás seguro de que quieres borrar todos los elementos?')) { recordedItems.forEach(item => { if (item.layer && map.hasLayer(item.layer)) { map.removeLayer(item.layer); } }); recordedItems = []; itemIdCounter = 0; updateItemList(); saveData(); showNotification('Todos los elementos han sido borrados.'); } });
-            saveData = function() { const savableItems = recordedItems.map(item => { const data = { id: item.id, name: item.name, type: item.type, coords: null }; if (item.type === 'point' && item.layer && typeof item.layer.getLatLng === 'function') { data.coords = item.layer.getLatLng(); } else if (item.type === 'track' && item.layer && typeof item.layer.getLatLngs === 'function') { data.coords = item.layer.getLatLngs(); } return data; }); localStorage.setItem('geoTrackerData', JSON.stringify(savableItems)); };
-            loadData = function() { const savedData = localStorage.getItem('geoTrackerData'); if (!savedData) return; try { const parsedItems = JSON.parse(savedData); let maxId = 0; parsedItems.forEach(savedItem => { let layer = null; if (!savedItem.coords) return; if (savedItem.type === 'point' && savedItem.coords.lat != null && savedItem.coords.lng != null) { layer = L.marker(savedItem.coords).addTo(map).bindPopup(savedItem.name); } else if (savedItem.type === 'track' && Array.isArray(savedItem.coords)) { const points = savedItem.coords.map(c => L.latLng(c.lat, c.lng)); if (points.length === 0) return; if (points.length > 2 && points[0].equals(points[points.length - 1])) { layer = L.polygon(points, { color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2 }).addTo(map); } else { layer = L.polyline(points, { color: 'red', weight: 4 }).addTo(map); } } if (layer) { recordedItems.push({ id: savedItem.id, name: savedItem.name, type: savedItem.type, layer: layer }); const idNum = parseInt(savedItem.id.split('-')[1]); if (idNum > maxId) maxId = idNum; } }); itemIdCounter = maxId; updateItemList(); } catch (e) { console.error("Erreur lors du chargement des données locales :", e); localStorage.removeItem('geoTrackerData'); } };
-            showNotification = function(message, type = 'success') { const notif = document.createElement('div'); notif.className = `toast-notification ${type}`; notif.textContent = message; notificationContainer.appendChild(notif); requestAnimationFrame(() => notif.classList.add('show')); setTimeout(() => { notif.classList.remove('show'); notif.addEventListener('transitionend', () => notif.remove(), { once: true }); }, 3500); };
-            updateItemList = function() { itemList.innerHTML = ''; recordedItems.forEach(item => { const li = document.createElement('li'); li.dataset.itemId = item.id; const nameSpan = document.createElement('span'); nameSpan.className = 'item-name'; nameSpan.textContent = item.name; const actionsDiv = document.createElement('div'); actionsDiv.className = 'item-actions'; const renameBtn = document.createElement('button'); renameBtn.innerHTML = '✏️'; renameBtn.className = 'rename-btn'; renameBtn.title = 'Renombrar'; const deleteBtn = document.createElement('button'); deleteBtn.innerHTML = '🗑️'; deleteBtn.className = 'delete-btn'; deleteBtn.title = 'Borrar'; actionsDiv.appendChild(renameBtn); actionsDiv.appendChild(deleteBtn); li.appendChild(nameSpan); li.appendChild(actionsDiv); itemList.appendChild(li); }); };
-            itemList.addEventListener('click', function(e) { const button = e.target.closest('button'); if (!button) return; const li = e.target.closest('li'); const itemId = li.dataset.itemId; const item = recordedItems.find(i => i.id === itemId); if (!item) return; const nameSpan = li.querySelector('.item-name'); if (button.classList.contains('delete-btn')) { map.removeLayer(item.layer); recordedItems = recordedItems.filter(i => i.id !== item.id); updateItemList(); saveData(); showNotification(`'${item.name}' ha sido borrado.`); } else if (button.classList.contains('rename-btn')) { nameSpan.contentEditable = true; nameSpan.focus(); button.innerHTML = '💾'; button.classList.remove('rename-btn'); button.classList.add('save-btn'); button.title = 'Guardar'; } else if (button.classList.contains('save-btn')) { const newName = nameSpan.textContent.trim(); if (newName) { item.name = newName; if (item.layer.getPopup()) { item.layer.setPopupContent(item.name); } else { item.layer.bindPopup(item.name); } saveData(); showNotification('Elemento renombrado.'); } nameSpan.contentEditable = false; button.innerHTML = '✏️'; button.classList.remove('save-btn'); button.classList.add('rename-btn'); button.title = 'Renombrar'; } });
-            openMenu = function() { menu.classList.add('open'); mapOverlay.classList.add('visible'); };
-            closeMenu = function() { menu.classList.remove('open'); mapOverlay.classList.remove('visible'); };
+            deleteAllBtn.addEventListener('click', function() {
+                if (recordedItems.length === 0) {
+                    return showNotification('No hay nada que borrar.', 'error');
+                }
+                // Suppression de la boîte de dialogue confirm() pour la compatibilité WebView
+                recordedItems.forEach(item => {
+                    if (item.layer && map.hasLayer(item.layer)) {
+                        map.removeLayer(item.layer);
+                    }
+                });
+                recordedItems = [];
+                itemIdCounter = 0;
+                updateItemList();
+                saveData();
+                showNotification('Todos los elementos han sido borrados.');
+            });
+            
+            function saveData() {
+                const savableItems = recordedItems.map(item => {
+                    const data = { id: item.id, name: item.name, type: item.type, coords: null };
+                    if (item.type === 'point' && item.layer && typeof item.layer.getLatLng === 'function') {
+                        data.coords = item.layer.getLatLng();
+                    } else if (item.type === 'track' && item.layer && typeof item.layer.getLatLngs === 'function') {
+                        data.coords = item.layer.getLatLngs();
+                    }
+                    return data;
+                });
+                localStorage.setItem('geoTrackerData', JSON.stringify(savableItems));
+            }
+            
+            function loadData() {
+                const savedData = localStorage.getItem('geoTrackerData');
+                if (!savedData) return;
+                try {
+                    const parsedItems = JSON.parse(savedData);
+                    let maxId = 0;
+                    parsedItems.forEach(savedItem => {
+                        let layer = null;
+                        if (!savedItem.coords) return;
+                        if (savedItem.type === 'point' && savedItem.coords.lat != null && savedItem.coords.lng != null) {
+                            layer = L.marker(savedItem.coords).addTo(map).bindPopup(savedItem.name);
+                        } else if (savedItem.type === 'track' && Array.isArray(savedItem.coords)) {
+                            const points = savedItem.coords.map(c => L.latLng(c.lat, c.lng));
+                            if (points.length === 0) return;
+                            if (points.length > 2 && points[0].equals(points[points.length - 1])) {
+                                layer = L.polygon(points, { color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2 }).addTo(map);
+                            } else {
+                                layer = L.polyline(points, { color: 'red', weight: 4 }).addTo(map);
+                            }
+                        }
+                        if (layer) {
+                            recordedItems.push({ id: savedItem.id, name: savedItem.name, type: savedItem.type, layer: layer });
+                            const idNum = parseInt(savedItem.id.split('-')[1]);
+                            if (idNum > maxId) maxId = idNum;
+                        }
+                    });
+                    itemIdCounter = maxId;
+                    updateItemList();
+                } catch (e) {
+                    console.error("Erreur lors du chargement des données locales :", e);
+                    localStorage.removeItem('geoTrackerData');
+                }
+            }
+            
+            function showNotification(message, type = 'success') { const notif = document.createElement('div'); notif.className = `toast-notification ${type}`; notif.textContent = message; notificationContainer.appendChild(notif); requestAnimationFrame(() => notif.classList.add('show')); setTimeout(() => { notif.classList.remove('show'); notif.addEventListener('transitionend', () => notif.remove(), { once: true }); }, 3500); }
+            
+            function updateItemList() {
+                itemList.innerHTML = '';
+                recordedItems.forEach(item => {
+                    const li = document.createElement('li');
+                    li.dataset.itemId = item.id;
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'item-name';
+                    nameSpan.textContent = item.name;
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'item-actions';
+                    const renameBtn = document.createElement('button');
+                    renameBtn.innerHTML = '✏️';
+                    renameBtn.className = 'rename-btn';
+                    renameBtn.title = 'Renombrar';
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.innerHTML = '🗑️';
+                    deleteBtn.className = 'delete-btn';
+                    deleteBtn.title = 'Borrar';
+                    actionsDiv.appendChild(renameBtn);
+                    actionsDiv.appendChild(deleteBtn);
+                    li.appendChild(nameSpan);
+                    li.appendChild(actionsDiv);
+                    itemList.appendChild(li);
+                });
+            }
+            
+            itemList.addEventListener('click', function(e) {
+                const button = e.target.closest('button');
+                if (!button) return;
+                const li = e.target.closest('li');
+                const itemId = li.dataset.itemId;
+                const item = recordedItems.find(i => i.id === itemId);
+                if (!item) return;
+                const nameSpan = li.querySelector('.item-name');
+                if (button.classList.contains('delete-btn')) {
+                    map.removeLayer(item.layer);
+                    recordedItems = recordedItems.filter(i => i.id !== item.id);
+                    updateItemList();
+                    saveData();
+                    showNotification(`'${item.name}' ha sido borrado.`);
+                } else if (button.classList.contains('rename-btn')) {
+                    nameSpan.contentEditable = true;
+                    nameSpan.focus();
+                    button.innerHTML = '💾';
+                    button.classList.remove('rename-btn');
+                    button.classList.add('save-btn');
+                    button.title = 'Guardar';
+                } else if (button.classList.contains('save-btn')) {
+                    const newName = nameSpan.textContent.trim();
+                    if (newName) {
+                        item.name = newName;
+                        if (item.layer.getPopup()) {
+                            item.layer.setPopupContent(item.name);
+                        } else {
+                            item.layer.bindPopup(item.name);
+                        }
+                        saveData();
+                        showNotification('Elemento renombrado.');
+                    }
+                    nameSpan.contentEditable = false;
+                    button.innerHTML = '✏️';
+                    button.classList.remove('save-btn');
+                    button.classList.add('rename-btn');
+                    button.title = 'Renombrar';
+                }
+            });
+            
+            function openMenu() { menu.classList.add('open'); mapOverlay.classList.add('visible'); }
+            function closeMenu() { menu.classList.remove('open'); mapOverlay.classList.remove('visible'); }
             menuCloseBtn.addEventListener('click', closeMenu);
             menuToggleBtn.addEventListener('click', (e) => { e.stopPropagation(); openMenu(); });
             mapOverlay.addEventListener('click', closeMenu);
-            exportShareBtn.addEventListener('click', function() { if (recordedItems.length === 0) return showNotification('No hay elementos para exportar.', 'error'); showNotification('Generando archivo KML...'); const kmlContent = generateKML(); const fileName = `export_geotracker_${new Date().toISOString().slice(0,10)}.kml`; if (window.Android && typeof window.Android.shareKml === 'function') { window.Android.shareKml(kmlContent, fileName); } else { showNotification('Función de compartir no disponible.', 'error'); } });
-            generateKML = function() { let kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n    <name>Datos del mapa interactivo</name>\n    <description>Exportado desde la aplicación web</description>\n`; recordedItems.forEach(item => { const safeName = item.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); kml += `      <Placemark>\n`; kml += `        <name>${safeName}</name>\n`; kml += `        <ExtendedData>\n`; kml += `          <Data name="name"><value>${safeName}</value></Data>\n`; kml += `          <Data name="comment"><value></value></Data>\n`; kml += `          <Data name="color"><value>#A9A9A9</value></Data>\n`; kml += `        </ExtendedData>\n`; if (item.type === 'point') { const coords = item.layer.getLatLng(); kml += `        <Point>\n          <coordinates>${coords.lng},${coords.lat},0</coordinates>\n        </Point>\n`; } else if (item.type === 'track') { const points = item.layer.getLatLngs(); if (points.length > 1) { const firstPoint = points[0]; const lastPoint = points[points.length - 1]; if (firstPoint.equals(lastPoint) && points.length > 2) { const coordsString = points.map(p => `${p.lng},${p.lat},0`).join(' '); kml += `        <Polygon>\n          <outerBoundaryIs>\n            <LinearRing>\n              <coordinates>${coordsString}</coordinates>\n            </LinearRing>\n          </outerBoundaryIs>\n        </Polygon>\n`; } else { const coordsString = points.map(p => `${p.lng},${p.lat},0`).join(' '); kml += `        <LineString>\n          <coordinates>${coordsString}</coordinates>\n        </LineString>\n`; } } } kml += `      </Placemark>\n`; }); kml += `  </Document>\n</kml>`; return kml; };
+
+            exportShareBtn.addEventListener('click', function() {
+                if (recordedItems.length === 0) return showNotification('No hay elementos para exportar.', 'error');
+                showNotification('Generando archivo KML...');
+                const kmlContent = generateKML();
+                const fileName = `export_geotracker_${new Date().toISOString().slice(0,10)}.kml`;
+                if (window.Android && typeof window.Android.shareKml === 'function') {
+                    window.Android.shareKml(kmlContent, fileName);
+                } else {
+                    showNotification('Función de compartir no disponible.', 'error');
+                }
+            });
+
+            function generateKML() {
+                let kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n    <name>Datos del mapa interactivo</name>\n    <description>Exportado desde la aplicación web</description>\n`;
+                recordedItems.forEach(item => {
+                    const safeName = item.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    kml += `      <Placemark>\n`;
+                    kml += `        <name>${safeName}</name>\n`;
+                    kml += `        <ExtendedData>\n`;
+                    kml += `          <Data name="name"><value>${safeName}</value></Data>\n`;
+                    kml += `          <Data name="comment"><value></value></Data>\n`;
+                    kml += `          <Data name="color"><value>#A9A9A9</value></Data>\n`;
+                    kml += `        </ExtendedData>\n`;
+                    if (item.type === 'point') {
+                        const coords = item.layer.getLatLng();
+                        kml += `        <Point>\n          <coordinates>${coords.lng},${coords.lat},0</coordinates>\n        </Point>\n`;
+                    } else if (item.type === 'track') {
+                        const points = item.layer.getLatLngs();
+                        if (points.length > 1) {
+                            const firstPoint = points[0];
+                            const lastPoint = points[points.length - 1];
+                            if (firstPoint.equals(lastPoint) && points.length > 2) {
+                                const coordsString = points.map(p => `${p.lng},${p.lat},0`).join(' ');
+                                kml += `        <Polygon>\n          <outerBoundaryIs>\n            <LinearRing>\n              <coordinates>${coordsString}</coordinates>\n            </LinearRing>\n          </outerBoundaryIs>\n        </Polygon>\n`;
+                            } else {
+                                const coordsString = points.map(p => `${p.lng},${p.lat},0`).join(' ');
+                                kml += `        <LineString>\n          <coordinates>${coordsString}</coordinates>\n        </LineString>\n`;
+                            }
+                        }
+                    }
+                    kml += `      </Placemark>\n`;
+                });
+                kml += `  </Document>\n</kml>`;
+                return kml;
+            }
             
             // --- DÉMARRAGE DE L'APPLICATION ---
             const savedMode = localStorage.getItem('mapMode');
