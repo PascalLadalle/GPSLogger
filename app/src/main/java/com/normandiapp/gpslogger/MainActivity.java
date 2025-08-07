@@ -49,7 +49,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
 
         // La ligne "addJavascriptInterface" est volontairement retirée car WebAppInterface n'existe pas.
 
-        webview.loadUrl("file:///android_asset/app_gps(2).html");
+        webview.loadUrl("file:///android_asset/app_gps.html");
 
         checkLocationPermission();
     }
