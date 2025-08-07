@@ -47,7 +47,7 @@
         #menu-footer { padding: 20px; border-top: 1px solid #ddd; background-color: #f8f9fa; }
         #delete-all { width: 100%; padding: 15px; background-color: #dc3545; color: white; border: none; cursor: pointer; font-size: 16px; margin-top: 15px; }
         
-        /* --- Icônes et Toggles --- */
+        /* --- STYLE FINAL POUR LA FLÈCHE DE DIRECTION --- */
         .direction-arrow {
             width: 0;
             height: 0;
@@ -63,6 +63,8 @@
             border-radius: 50%;
             border: 1px solid #FF4136;
         }
+
+        /* --- Style pour le toggle --- */
         .toggle-container { display: flex; align-items: center; justify-content: space-around; font-size: 14px;}
         .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
         .switch input { opacity: 0; width: 0; height: 0; }
@@ -232,6 +234,7 @@
             }
 
             function startNewTrack() { const id = `track-${++itemIdCounter}`; const trackName = `Recorrido ${itemIdCounter}`; currentTrack = L.polyline([], { color: 'red', weight: 4 }).addTo(map); recordedItems.push({ id, name: trackName, type: 'track', layer: currentTrack }); updateItemList(); }
+            
             addPointBtn.addEventListener('click', function() { if (!userPositionMarker) return showNotification('Posición no encontrada.', 'error'); map.flyTo(userPositionMarker.getLatLng(), 18); const id = `point-${++itemIdCounter}`; const pointName = `Punto ${itemIdCounter}`; const latlng = userPositionMarker.getLatLng(); const point = L.marker(latlng).addTo(map).bindPopup(pointName); recordedItems.push({ id, name: pointName, type: 'point', layer: point }); updateItemList(); saveData(); showNotification(`Nuevo punto creado: ${pointName}`); });
 
             
