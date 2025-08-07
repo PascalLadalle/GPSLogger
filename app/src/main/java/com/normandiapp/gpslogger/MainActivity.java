@@ -18,13 +18,12 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-// On implémente directement les écouteurs ici
 public class MainActivity extends AppCompatActivity implements LocationListener, SensorEventListener {
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
     private WebView webview;
+    private WebAppInterface webAppInterface; // <-- LIGNE 1/3 RESTAURÉE
 
-    // Variables pour les capteurs
     private LocationManager locationManager;
     private SensorManager sensorManager;
     private final float[] rotationMatrix = new float[9];
@@ -35,11 +34,9 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Initialisation des managers pour les capteurs
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
 
-        // Configuration de la WebView
         webview = findViewById(R.id.webview);
         webview.getSettings().setJavaScriptEnabled(true);
         webview.getSettings().setDomStorageEnabled(true);
@@ -47,20 +44,23 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
         webview.getSettings().setDatabaseEnabled(true);
         webview.getSettings().setAllowFileAccess(true);
 
-        // La ligne "addJavascriptInterface" est volontairement retirée car WebAppInterface n'existe pas.
+        // --- LIGNES 2 & 3 RESTAURÉES POUR RÉPARER LE PARTAGE KML ---
+        webAppInterface = new WebAppInterface(this);
+        webview.addJavascriptInterface(webAppInterface, "Android");
+        // --- FIN DE LA RÉPARATION ---
 
-        webview.loadUrl("file:///android_asset/app_gps.html");
-
+        webview.loadUrl("file:///android_asset/app_gps(2).html");
         checkLocationPermission();
     }
-
+    
+    // Le reste du fichier est identique à la version précédente qui faisait tourner le curseur.
+    
     private void checkLocationPermission() {
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, LOCATION_PERMISSION_REQUEST_CODE);
         }
     }
 
-    // Méthode pour démarrer l'écoute des capteurs
     private void startSensorUpdates() {
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
@@ -73,12 +73,10 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
         }
     }
 
-    // Méthode pour arrêter l'écoute (économiser la batterie)
     private void stopSensorUpdates() {
         locationManager.removeUpdates(this);
         sensorManager.unregisterListener(this);
     }
-
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -104,9 +102,6 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
         stopSensorUpdates();
     }
 
-
-    // --- MÉTHODES DES ÉCOUTEURS (LISTENERS) ---
-
     @Override
     public void onLocationChanged(@NonNull Location location) {
         webview.evaluateJavascript("javascript:updatePositionFromNative(" + location.getLatitude() + "," + location.getLongitude() + "," + location.getAccuracy() + ")", null);
@@ -122,11 +117,8 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
     }
 
     @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {
-        // Non utilisé
-    }
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {}
 
-    // Méthodes requises par LocationListener
     @Override
     public void onStatusChanged(String provider, int status, Bundle extras) {}
 
