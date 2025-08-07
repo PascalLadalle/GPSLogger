@@ -1,7 +1,6 @@
-package com.ladalle.gpslogger;
+package com.normandiapp.gpslogger; // <-- LA LIGNE CORRIGÉE EST ICI
 
 import android.content.Context;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -41,7 +40,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
 
-        // Configuration de la WebView (inchangée)
+        // Configuration de la WebView
         webview = findViewById(R.id.webview);
         webview.getSettings().setJavaScriptEnabled(true);
         webview.getSettings().setDomStorageEnabled(true);
