@@ -1,6 +1,7 @@
 package com.normandiapp.gpslogger;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -9,7 +10,9 @@ import android.hardware.SensorManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Bundle;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import android.widget.Toast;
 
@@ -17,12 +20,16 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity implements LocationListener, SensorEventListener {
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
     private WebView webview;
-    private WebAppInterface webAppInterface; // <-- LIGNE 1/3 RESTAURÉE
 
     private LocationManager locationManager;
     private SensorManager sensorManager;
@@ -44,17 +51,46 @@ public class MainActivity extends AppCompatActivity implements LocationListener,
         webview.getSettings().setDatabaseEnabled(true);
         webview.getSettings().setAllowFileAccess(true);
 
-        // --- LIGNES 2 & 3 RESTAURÉES POUR RÉPARER LE PARTAGE KML ---
-        webAppInterface = new WebAppInterface(this);
-        webview.addJavascriptInterface(webAppInterface, "Android");
-        // --- FIN DE LA RÉPARATION ---
+        webview.addJavascriptInterface(new WebAppInterface(this), "Android");
 
-        webview.loadUrl("file:///android_asset/app_gps(2).html");
+        // CORRECTION FINALE : Utilisation du nom de fichier correct "app_gps.html"
+        webview.loadUrl("file:///android_asset/app_gps.html");
+
         checkLocationPermission();
     }
-    
-    // Le reste du fichier est identique à la version précédente qui faisait tourner le curseur.
-    
+
+    public class WebAppInterface {
+        private Context mContext;
+
+        WebAppInterface(Context c) {
+            mContext = c;
+        }
+
+        @JavascriptInterface
+        public void shareKml(String kmlContent, String fileName) {
+            try {
+                File kmlFile = new File(mContext.getCacheDir(), fileName);
+                FileOutputStream outputStream = new FileOutputStream(kmlFile);
+                outputStream.write(kmlContent.getBytes());
+                outputStream.close();
+
+                Uri fileUri = FileProvider.getUriForFile(mContext, "com.normandiapp.gpslogger.provider", kmlFile);
+
+                Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                shareIntent.setType("application/vnd.google-earth.kml+xml");
+                shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+                shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+                mContext.startActivity(Intent.createChooser(shareIntent, "Partager le fichier KML via"));
+
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(mContext, "Erreur de partage: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                e.printStackTrace();
+            }
+        }
+    }
+
     private void checkLocationPermission() {
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, LOCATION_PERMISSION_REQUEST_CODE);
