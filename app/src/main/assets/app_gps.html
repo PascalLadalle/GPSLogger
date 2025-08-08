@@ -47,22 +47,30 @@
         #menu-footer { padding: 20px; border-top: 1px solid #ddd; background-color: #f8f9fa; }
         #delete-all { width: 100%; padding: 15px; background-color: #dc3545; color: white; border: none; cursor: pointer; font-size: 16px; margin-top: 15px; }
         
-        /* --- STYLE FINAL POUR LA FLÈCHE DE DIRECTION --- */
-        .direction-marker-container { /* Conteneur transparent pour la position gérée par Leaflet */ }
+        /* --- MODIFICATION 1/2 : STYLE POUR LA FLÈCHE DE DIRECTION --- */
+        .direction-marker-container { 
+            /* Ce conteneur est géré par Leaflet, il reste vide et transparent. */ 
+        }
         .direction-arrow {
             width: 0;
             height: 0;
-            border-left: 7px solid transparent;
-            border-right: 7px solid transparent;
-            border-bottom: 21px solid #FF4136; /* Rouge vif */
+            border-left: 10px solid transparent;   /* Largeur de la base de la flèche */
+            border-right: 10px solid transparent;  /* Largeur de la base de la flèche */
+            border-bottom: 25px solid #007BFF; /* Couleur et hauteur de la flèche */
+            
+            /* Effet d'ombre pour mieux ressortir */
             filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
-            transition: transform 0.2s linear;
-            transform-origin: center 15px; 
+            
+            /* Transition douce lors de la rotation */
+            transition: transform 0.2s linear; 
+            
+            /* Point de pivot pour la rotation (important pour que ça tourne sur la base) */
+            transform-origin: center 18px; 
         }
         .direction-accuracy {
-            background-color: rgba(255, 65, 54, 0.1);
+            background-color: rgba(0, 123, 255, 0.1); /* Bleu clair transparent */
             border-radius: 50%;
-            border: 1px solid #FF4136;
+            border: 1px solid #007BFF;
         }
 
         /* --- Style pour le toggle --- */
@@ -147,11 +155,12 @@
             window.updatePositionFromNative = function(lat, lng, accuracy) {
                 const newLatLng = L.latLng(lat, lng);
                 if (!userPositionMarker) {
+                    // On crée l'icône personnalisée (la flèche)
                     const arrowIcon = L.divIcon({ 
                         className: 'direction-marker-container',
                         html: '<div class="direction-arrow"></div>',
-                        iconSize: [14, 21], 
-                        iconAnchor: [7, 21] 
+                        iconSize: [20, 25], // Taille de la flèche (width, height)
+                        iconAnchor: [10, 25]  // Pointe de l'ancre (pointe de la flèche)
                     });
                     userPositionMarker = L.marker(newLatLng, { icon: arrowIcon }).addTo(map);
                     accuracyCircle = L.circle(newLatLng, { radius: accuracy, className: 'direction-accuracy' }).addTo(map);
@@ -165,14 +174,18 @@
                     else { const lastPoint = trackPoints[trackPoints.length - 1]; if (newLatLng.distanceTo(lastPoint) >= minDistanceBetweenPoints) { currentTrack.addLatLng(newLatLng); } }
                 }
             };
-
+            
+            // --- MODIFICATION 2/2 : FONCTION DE ROTATION DU CURSEUR ---
             window.updateHeadingFromNative = function(heading) {
+                // On vérifie que le marqueur de position existe et a été ajouté à la carte
                 if (userPositionMarker && userPositionMarker.getElement()) {
-                    const container = userPositionMarker.getElement();
-                    const arrow = container.querySelector('.direction-arrow');
-                    if (arrow) {
-                        // LA LIGNE CORRIGÉE EST ICI :
-                        arrow.style.transform = `rotate(${heading}deg)`;
+                    // On récupère l'élément HTML qui contient notre flèche
+                    const arrowElement = userPositionMarker.getElement().querySelector('.direction-arrow');
+                    
+                    if (arrowElement) {
+                        // On applique la rotation CSS à la flèche.
+                        // 'heading' est l'angle en degrés envoyé par le code Java.
+                        arrowElement.style.transform = `rotate(${heading}deg)`;
                     }
                 }
             };
@@ -254,7 +267,6 @@
                 if (recordedItems.length === 0) {
                     return showNotification('No hay nada que borrar.', 'error');
                 }
-                // Suppression de confirm() pour la compatibilité
                 recordedItems.forEach(item => {
                     if (item.layer && map.hasLayer(item.layer)) {
                         map.removeLayer(item.layer);
