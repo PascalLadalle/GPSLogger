@@ -153,7 +153,7 @@ public class MainActivity extends AppCompatActivity {
                 writer.flush();
                 writer.close();
 
-                // Utilisation de la méthode directe Uri.fromFile
+                // --- RETOUR À L'ANCIENNE MÉTHODE COMME DEMANDÉ ---
                 Uri fileUri = Uri.fromFile(file);
 
                 Intent shareIntent = new Intent(Intent.ACTION_SEND);
