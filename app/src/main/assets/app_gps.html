@@ -304,7 +304,7 @@
                 }
             });
 
-            function generateKML() {
+function generateKML() {
                 let kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n    <name>Datos del mapa interactivo</name>\n    <description>Exportado desde la aplicación web</description>\n`;
                 recordedItems.forEach(item => {
                     const safeName = item.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -315,29 +315,38 @@
                     kml += `          <Data name="comment"><value></value></Data>\n`;
                     kml += `          <Data name="color"><value>#A9A9A9</value></Data>\n`;
                     kml += `        </ExtendedData>\n`;
+                    
                     if (item.type === 'point') {
                         const coords = item.layer.getLatLng();
                         kml += `        <Point>\n          <coordinates>${coords.lng},${coords.lat},0</coordinates>\n        </Point>\n`;
+                    
                     } else if (item.type === 'track') {
-                        const points = item.layer.getLatLngs();
-                        if (points.length > 1) {
-                            const firstPoint = points[0];
-                            const lastPoint = points[points.length - 1];
-                            if (firstPoint.equals(lastPoint) && points.length > 2) {
-                                const coordsString = points.map(p => `${p.lng},${p.lat},0`).join(' ');
+                        // --- DÉBUT DE LA CORRECTION ---
+
+                        // On vérifie si la couche est un Polygone
+                        if (item.layer instanceof L.Polygon) {
+                            // On récupère le contour extérieur (premier tableau)
+                            const polygonPoints = item.layer.getLatLngs()[0]; 
+                            if (polygonPoints.length > 2) {
+                                const coordsString = polygonPoints.map(p => `${p.lng},${p.lat},0`).join(' ');
                                 kml += `        <Polygon>\n          <outerBoundaryIs>\n            <LinearRing>\n              <coordinates>${coordsString}</coordinates>\n            </LinearRing>\n          </outerBoundaryIs>\n        </Polygon>\n`;
-                            } else {
-                                const coordsString = points.map(p => `${p.lng},${p.lat},0`).join(' ');
+                            }
+                        } 
+                        // Sinon, c'est une Polyligne
+                        else if (item.layer instanceof L.Polyline) { 
+                            const linePoints = item.layer.getLatLngs();
+                            if (linePoints.length > 1) {
+                                const coordsString = linePoints.map(p => `${p.lng},${p.lat},0`).join(' ');
                                 kml += `        <LineString>\n          <coordinates>${coordsString}</coordinates>\n        </LineString>\n`;
                             }
                         }
+                        // --- FIN DE LA CORRECTION ---
                     }
                     kml += `      </Placemark>\n`;
                 });
                 kml += `  </Document>\n</kml>`;
                 return kml;
-            }
-            
+            }            
             // --- DÉMARRAGE DE L'APPLICATION ---
             const savedMode = localStorage.getItem('mapMode');
             setMapMode(savedMode === 'online');
@@ -346,3 +355,4 @@
     </script>
 </body>
 </html>
+
