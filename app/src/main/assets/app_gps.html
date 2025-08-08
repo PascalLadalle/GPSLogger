@@ -206,14 +206,19 @@
 
             // --- SECTION 4 : LOGIQUE D'ENREGISTREMENT ET DE CONTRÔLE ---
 
-            toggleRecordBtn.addEventListener('click', function() {
+toggleRecordBtn.addEventListener('click', function() {
                 isRecording = !isRecording;
                 this.textContent = isRecording ? 'Detener Grabación' : 'Iniciar Grabación';
                 this.style.backgroundColor = isRecording ? '#dc3545' : '#007BFF';
+
                 if (isRecording) {
-                    if (userPositionMarker) { map.flyTo(userPositionMarker.getLatLng(), 18); }
-                    startNewTrack();
-                    showNotification('Grabación iniciada.');
+                    startNewTrack(); 
+                    if (userPositionMarker) {
+                        map.flyTo(userPositionMarker.getLatLng(), 18);
+                        showNotification('Grabación iniciada.');
+                    } else {
+                        showNotification('Grabación iniciada. Esperando señal GPS...');
+                    }
                 } else {
                     const trackToFinalize = currentTrack;
                     currentTrack = null;
@@ -226,7 +231,6 @@
                         const lastPoint = points[points.length - 1];
                         if (firstPoint.distanceTo(lastPoint) < 5) {
                             points.push(firstPoint);
-                            trackToFinalize.setLatLngs(points);
                             const polygon = L.polygon(points, {color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2}).addTo(map);
                             const oldTrackItem = recordedItems.find(item => item.layer === trackToFinalize);
                             if(oldTrackItem) oldTrackItem.layer = polygon;
@@ -358,12 +362,13 @@ function generateKML() {
                 return kml;
             }            
             // --- DÉMARRAGE DE L'APPLICATION ---
-            const savedMode = localStorage.getItem('mapMode');
-            setMapMode(savedMode === 'online');
+// --- DÉMARRAGE DE L'APPLICATION (MODIFIÉ) ---
+            setMapMode(false); 
             loadData();
         });
     </script>
 </body>
 </html>
+
 
 
