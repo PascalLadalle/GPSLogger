@@ -2,15 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.normandiapp.gpslogger">
 
-    <!-- Permissions GPS (déjà présentes) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- Permission de stockage (déjà présente) -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-
-    <!-- NOUVELLES PERMISSIONS REQUISES -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <!-- Requise pour Android 13+ pour afficher la notification du service -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <application
@@ -20,6 +15,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.GPSLogger"
         android:requestLegacyExternalStorage="true">
+
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -29,7 +25,6 @@
             </intent-filter>
         </activity>
 
-        <!-- DÉCLARATION DU NOUVEAU SERVICE -->
         <service android:name=".LocationService" />
 
     </application>
