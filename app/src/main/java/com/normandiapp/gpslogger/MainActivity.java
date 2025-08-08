@@ -14,20 +14,26 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
+import android.widget.Toast;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
     private WebView webview;
 
-    // --- NOUVELLE LOGIQUE ---
     private LocationManager locationManager;
     private LocationListener locationListener;
     private BroadcastReceiver serviceLocationReceiver;
-    private boolean isRecording = false; // Pour savoir si le service est actif
+    private boolean isRecording = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,10 +57,8 @@ public class MainActivity extends AppCompatActivity {
         locationListener = new LocationListener() {
             @Override
             public void onLocationChanged(Location location) {
-                // Cette méthode est utilisée pour le mode PASSIF
                 sendLocationToWebView(location);
             }
-            // Autres méthodes de l'interface (onProviderDisabled, etc.)
         };
     }
 
@@ -62,7 +66,6 @@ public class MainActivity extends AppCompatActivity {
         serviceLocationReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                // Cette méthode est utilisée pour le mode ACTIF (pendant l'enregistrement)
                 if (intent != null && LocationService.ACTION_LOCATION_BROADCAST.equals(intent.getAction())) {
                     double lat = intent.getDoubleExtra(LocationService.EXTRA_LATITUDE, 0);
                     double lng = intent.getDoubleExtra(LocationService.EXTRA_LONGITUDE, 0);
@@ -96,22 +99,18 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // Si on n'enregistre PAS, on démarre l'écoute passive
         if (!isRecording) {
             startPassiveLocationUpdates();
         }
-        // On écoute toujours les messages du service, au cas où
         LocalBroadcastManager.getInstance(this).registerReceiver(serviceLocationReceiver, new IntentFilter(LocationService.ACTION_LOCATION_BROADCAST));
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        // Si on n'enregistre PAS, on arrête l'écoute passive pour économiser la batterie
         if (!isRecording) {
             stopPassiveLocationUpdates();
         }
-        // On désenregistre toujours le récepteur
         LocalBroadcastManager.getInstance(this).unregisterReceiver(serviceLocationReceiver);
     }
 
@@ -135,21 +134,45 @@ public class MainActivity extends AppCompatActivity {
         }
     }
     
-    // L'interface pour le JavaScript
     public class WebAppInterface {
         Context mContext;
 
         WebAppInterface(Context c) { mContext = c; }
 
         @JavascriptInterface
-        public void shareKml(String kmlContent, String fileName) { /* ... inchangé ... */ }
+        public void shareKml(String kmlContent, String fileName) {
+            File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            File file = new File(path, fileName);
+
+            try {
+                if (!path.exists()) {
+                    path.mkdirs();
+                }
+                FileWriter writer = new FileWriter(file);
+                writer.append(kmlContent);
+                writer.flush();
+                writer.close();
+
+                // Utilisation de la méthode directe Uri.fromFile
+                Uri fileUri = Uri.fromFile(file);
+
+                Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                shareIntent.setType("application/vnd.google-earth.kml+xml");
+                shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+                
+                startActivity(Intent.createChooser(shareIntent, "Compartir archivo KML"));
+
+            } catch (IOException e) {
+                e.printStackTrace();
+                runOnUiThread(() -> Toast.makeText(mContext, "Error al guardar el archivo KML.", Toast.LENGTH_SHORT).show());
+            }
+        }
 
         @JavascriptInterface
         public void startNativeUpdates() {
             isRecording = true;
-            stopPassiveLocationUpdates(); // Arrête l'écoute passive de l'activité
+            stopPassiveLocationUpdates();
             
-            // Démarre le service de premier plan
             Intent serviceIntent = new Intent(mContext, LocationService.class);
             ContextCompat.startForegroundService(mContext, serviceIntent);
         }
@@ -158,12 +181,10 @@ public class MainActivity extends AppCompatActivity {
         public void stopNativeUpdates() {
             isRecording = false;
             
-            // Arrête le service
             Intent serviceIntent = new Intent(mContext, LocationService.class);
             mContext.stopService(serviceIntent);
 
-            // Redémarre l'écoute passive
-            runOnUiThread(() -> startPassiveLocationUpdates());
+            runOnUiThread(this::startPassiveLocationUpdates);
         }
     }
 }
