@@ -152,15 +152,15 @@
 
             // --- SECTION 2 : "PONT" NATIF <-> WEB ---
 
-            window.updatePositionFromNative = function(lat, lng, accuracy) {
+window.updatePositionFromNative = function(lat, lng, accuracy) {
                 const newLatLng = L.latLng(lat, lng);
                 if (!userPositionMarker) {
-                    // On crée l'icône personnalisée (la flèche)
+                    // (Le code de création du marqueur reste identique)
                     const arrowIcon = L.divIcon({ 
                         className: 'direction-marker-container',
                         html: '<div class="direction-arrow"></div>',
-                        iconSize: [20, 25], // Taille de la flèche (width, height)
-                        iconAnchor: [10, 25]  // Pointe de l'ancre (pointe de la flèche)
+                        iconSize: [20, 25],
+                        iconAnchor: [10, 25]
                     });
                     userPositionMarker = L.marker(newLatLng, { icon: arrowIcon }).addTo(map);
                     accuracyCircle = L.circle(newLatLng, { radius: accuracy, className: 'direction-accuracy' }).addTo(map);
@@ -168,29 +168,39 @@
                     userPositionMarker.setLatLng(newLatLng);
                     accuracyCircle.setLatLng(newLatLng).setRadius(accuracy);
                 }
+
+                // --- DÉBUT DE LA MODIFICATION ---
                 if (isRecording && currentTrack) {
                     const trackPoints = currentTrack.getLatLngs();
-                    if (trackPoints.length === 0) { currentTrack.addLatLng(newLatLng); } 
-                    else { const lastPoint = trackPoints[trackPoints.length - 1]; if (newLatLng.distanceTo(lastPoint) >= minDistanceBetweenPoints) { currentTrack.addLatLng(newLatLng); } }
+                    let pointAdded = false; // On utilise un drapeau pour savoir si on doit sauvegarder
+
+                    if (trackPoints.length === 0) { 
+                        currentTrack.addLatLng(newLatLng);
+                        pointAdded = true;
+                    } else { 
+                        const lastPoint = trackPoints[trackPoints.length - 1]; 
+                        if (newLatLng.distanceTo(lastPoint) >= minDistanceBetweenPoints) { 
+                            currentTrack.addLatLng(newLatLng); 
+                            pointAdded = true;
+                        }
+                    }
+
+                    // Si un nouveau point a été ajouté au tracé, on sauvegarde TOUT l'état.
+                    if (pointAdded) {
+                        saveData();
+                    }
                 }
+                // --- FIN DE LA MODIFICATION ---
             };
-            
-            // --- MODIFICATION 2/2 : FONCTION DE ROTATION DU CURSEUR ---
-            window.updateHeadingFromNative = function(heading) {
-                // On vérifie que le marqueur de position existe et a été ajouté à la carte
+window.updateHeadingFromNative = function(heading) {
                 if (userPositionMarker && userPositionMarker.getElement()) {
-                    // On récupère l'élément HTML qui contient notre flèche
                     const arrowElement = userPositionMarker.getElement().querySelector('.direction-arrow');
                     
                     if (arrowElement) {
-                        // On applique la rotation CSS à la flèche.
-                        // 'heading' est l'angle en degrés envoyé par le code Java.
                         arrowElement.style.transform = `rotate(${heading}deg)`;
                     }
                 }
             };
-
-
             // --- SECTION 3 : GESTION DES MODES DE CARTE ---
 
             function setMapMode(isOnline) {
@@ -206,13 +216,13 @@
 
             // --- SECTION 4 : LOGIQUE D'ENREGISTREMENT ET DE CONTRÔLE ---
 
-toggleRecordBtn.addEventListener('click', function() {
+            toggleRecordBtn.addEventListener('click', function() {
                 isRecording = !isRecording;
                 this.textContent = isRecording ? 'Detener Grabación' : 'Iniciar Grabación';
                 this.style.backgroundColor = isRecording ? '#dc3545' : '#007BFF';
 
                 if (isRecording) {
-                    startNewTrack(); 
+                    startNewTrack();
                     if (userPositionMarker) {
                         map.flyTo(userPositionMarker.getLatLng(), 18);
                         showNotification('Grabación iniciada.');
@@ -220,33 +230,62 @@ toggleRecordBtn.addEventListener('click', function() {
                         showNotification('Grabación iniciada. Esperando señal GPS...');
                     }
                 } else {
+                    // --- DÉBUT DE LA LOGIQUE CORRIGÉE ---
                     const trackToFinalize = currentTrack;
                     currentTrack = null;
+
                     if (trackToFinalize && trackToFinalize.getLatLngs().length > 2) {
+                        // 1. On récupère les points bruts UNE SEULE FOIS.
                         let points = trackToFinalize.getLatLngs();
-                        const finalPoints = intelligentSimplify(points);
-                        trackToFinalize.setLatLngs(finalPoints);
-                        points = trackToFinalize.getLatLngs();
+
+                        // 2. ON VÉRIFIE LA FERMETURE SUR LES DONNÉES BRUTES AVANT TOUT.
                         const firstPoint = points[0];
                         const lastPoint = points[points.length - 1];
-                        if (firstPoint.distanceTo(lastPoint) < 5) {
+                        const isClosedLoop = firstPoint.distanceTo(lastPoint) < 5;
+
+                        if (isClosedLoop) {
+                            // C'EST UN POLYGONE
+                            // 3a. On s'assure que la boucle est bien fermée pour la simplification.
                             points.push(firstPoint);
-                            const polygon = L.polygon(points, {color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2}).addTo(map);
+                            
+                            // 4a. On simplifie le tracé maintenant qu'il est fermé.
+                            const simplifiedPolygonPoints = intelligentSimplify(points);
+                            
+                            // 5a. On crée le nouveau polygone à partir des points simplifiés.
+                            const polygon = L.polygon(simplifiedPolygonPoints, {color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2}).addTo(map);
+                            
+                            // 6a. On met à jour notre liste de données.
                             const oldTrackItem = recordedItems.find(item => item.layer === trackToFinalize);
                             if(oldTrackItem) oldTrackItem.layer = polygon;
+                            
+                            // 7a. On supprime l'ancienne ligne de la carte.
                             map.removeLayer(trackToFinalize);
+                            showNotification('Polygone créé et simplifié.');
+
+                        } else {
+                            // C'EST UNE SIMPLE LIGNE
+                            // 3b. On simplifie la ligne ouverte.
+                            const simplifiedLinePoints = intelligentSimplify(points);
+                            
+                            // 4b. On met à jour la ligne existante avec les points simplifiés.
+                            trackToFinalize.setLatLngs(simplifiedLinePoints);
+                            showNotification('Recorrido finalizado y procesado.');
                         }
-                        showNotification('Recorrido finalizado y procesado.');
+                        
                     } else if (trackToFinalize) {
+                        // Logique pour les tracés trop courts (inchangée et correcte)
                         const itemToRemove = recordedItems.pop();
                         if (itemToRemove) map.removeLayer(itemToRemove.layer);
                         updateItemList();
                         showNotification('Grabación detenida. Recorrido demasiado corto.', 'error');
                     }
+                    
+                    // On sauvegarde le résultat final.
                     saveData();
+                    // --- FIN DE LA LOGIQUE CORRIGÉE ---
                 }
             });
-
+            
 function intelligentSimplify(points) {
                 // Pour un polygone, il faut au moins 4 points (ex: A, B, C, A)
                 if (points.length < 4) return points;
@@ -369,6 +408,7 @@ function generateKML() {
     </script>
 </body>
 </html>
+
 
 
 
