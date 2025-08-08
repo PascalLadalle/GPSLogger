@@ -1,5 +1,3 @@
-// FICHIER : LocationService.java (NOUVEAU)
-
 package com.normandiapp.gpslogger;
 
 import android.app.Notification;
@@ -40,7 +38,6 @@ public class LocationService extends Service {
         locationListener = new LocationListener() {
             @Override
             public void onLocationChanged(Location location) {
-                // Envoyer les données de localisation à MainActivity
                 sendLocationBroadcast(location);
             }
             @Override
@@ -54,33 +51,29 @@ public class LocationService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // Créer la notification pour le service de premier plan
         createNotificationChannel();
         Notification notification = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
                 .setContentTitle("GPSLogger")
-                .setContentText("Enregistrement du parcours en cours...")
-                .setSmallIcon(R.mipmap.ic_launcher) // Assurez-vous d'avoir cette icône
+                .setContentText("Servicio de GPS activo")
+                .setSmallIcon(R.mipmap.ic_launcher)
                 .setOngoing(true)
                 .build();
 
-        // Démarrer le service en premier plan
         startForeground(NOTIFICATION_ID, notification);
 
-        // Démarrer l'écoute des mises à jour GPS
         try {
             locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 1, locationListener);
         } catch (SecurityException e) {
             e.printStackTrace();
-            stopSelf(); // Arrêter le service si les permissions sont manquantes
+            stopSelf();
         }
 
-        return START_STICKY; // Le service redémarrera s'il est tué par le système
+        return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        // Arrêter l'écoute GPS
         locationManager.removeUpdates(locationListener);
     }
 
@@ -101,7 +94,7 @@ public class LocationService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel serviceChannel = new NotificationChannel(
                     NOTIFICATION_CHANNEL_ID,
-                    "Location Service Channel",
+                    "Canal de Servicio de Ubicación",
                     NotificationManager.IMPORTANCE_LOW
             );
             NotificationManager manager = getSystemService(NotificationManager.class);
