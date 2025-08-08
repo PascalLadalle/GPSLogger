@@ -8,25 +8,16 @@
     <link rel="stylesheet" href="./leaflet.css" />
 
     <style>
-        /* --- Structure Générale --- */
         body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         #map { height: 100%; width: 100%; z-index: 1; background-color: #e0e0e0; }
-
-        /* --- Superposition pour le menu --- */
         #map-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 999; display: none; opacity: 0; transition: opacity 0.3s ease; }
         #map-overlay.visible { display: block; opacity: 1; }
-
-        /* --- Notifications (Toasts) --- */
         #notification-container { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1001; pointer-events: none; width: 90%; max-width: 500px; }
         .toast-notification { padding: 12px 25px; border-radius: 25px; color: white; background-color: rgba(0, 0, 0, 0.75); box-shadow: 0 4px 12px rgba(0,0,0,0.2); margin-bottom: 10px; opacity: 0; transform: translateY(-30px); transition: opacity 0.4s ease, transform 0.4s ease; text-align: center; }
         .toast-notification.show { opacity: 1; transform: translateY(0); }
         .toast-notification.error { background-color: #dc3545; }
-
-        /* --- Contrôles sur la Carte --- */
         #controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2; display: flex; gap: 10px; }
         #controls button { padding: 15px 20px; font-size: 16px; border-radius: 50px; border: 2px solid #fff; background-color: #007BFF; color: white; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
-        
-        /* --- Menu Latéral --- */
         #menu-toggle { position: absolute; top: 20px; right: 20px; z-index: 1000; padding: 10px 15px; font-size: 24px; border-radius: 50%; border: 2px solid #ccc; background-color: white; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
         #menu { position: fixed; top: 0; left: -300px; width: 280px; height: 100%; background-color: white; z-index: 1001; transition: left 0.3s ease-in-out; display: flex; flex-direction: column; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }
         #menu.open { left: 0; }
@@ -46,34 +37,17 @@
         .delete-btn { background-color: #dc3545; }
         #menu-footer { padding: 20px; border-top: 1px solid #ddd; background-color: #f8f9fa; }
         #delete-all { width: 100%; padding: 15px; background-color: #dc3545; color: white; border: none; cursor: pointer; font-size: 16px; margin-top: 15px; }
-        
-        /* --- MODIFICATION 1/2 : STYLE POUR LA FLÈCHE DE DIRECTION --- */
-        .direction-marker-container { 
-            /* Ce conteneur est géré par Leaflet, il reste vide et transparent. */ 
-        }
+        .direction-marker-container { }
         .direction-arrow {
-            width: 0;
-            height: 0;
-            border-left: 10px solid transparent;   /* Largeur de la base de la flèche */
-            border-right: 10px solid transparent;  /* Largeur de la base de la flèche */
-            border-bottom: 25px solid #007BFF; /* Couleur et hauteur de la flèche */
-            
-            /* Effet d'ombre pour mieux ressortir */
+            width: 0; height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 25px solid #007BFF;
             filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
-            
-            /* Transition douce lors de la rotation */
-            transition: transform 0.2s linear; 
-            
-            /* Point de pivot pour la rotation (important pour que ça tourne sur la base) */
-            transform-origin: center 18px; 
+            transition: transform 0.2s linear;
+            transform-origin: center 18px;
         }
-        .direction-accuracy {
-            background-color: rgba(0, 123, 255, 0.1); /* Bleu clair transparent */
-            border-radius: 50%;
-            border: 1px solid #007BFF;
-        }
-
-        /* --- Style pour le toggle --- */
+        .direction-accuracy { background-color: rgba(0, 123, 255, 0.1); border-radius: 50%; border: 1px solid #007BFF; }
         .toggle-container { display: flex; align-items: center; justify-content: space-around; font-size: 14px;}
         .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
         .switch input { opacity: 0; width: 0; height: 0; }
@@ -109,12 +83,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             
-            // --- SECTION 1 : INITIALISATION ---
-
-            const map = L.map('map', { 
-                zoomControl: false,
-                maxZoom: 21 
-            });
+            const map = L.map('map', { zoomControl: false, maxZoom: 21 });
 
             let userPositionMarker, accuracyCircle, isRecording = false;
             let currentTrack;
@@ -123,10 +92,7 @@
 
             const imageBounds = [[8.468908, -71.669649], [8.480803, -71.657762]];
             let onlineTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
-                attribution: 'Esri', 
-                className: 'map-layer-online',
-                maxZoom: 21,
-                maxNativeZoom: 18 
+                attribution: 'Esri', className: 'map-layer-online', maxZoom: 21, maxNativeZoom: 18 
             });
             let offlineImageLayer = L.imageOverlay('map_background.jpg', imageBounds, { className: 'map-layer-offline' });
             
@@ -149,17 +115,12 @@
                 shadowUrl: './images/marker-shadow.png'
             });
 
-
-            // --- SECTION 2 : "PONT" NATIF <-> WEB ---
-
             window.updatePositionFromNative = function(lat, lng, accuracy) {
                 const newLatLng = L.latLng(lat, lng);
                 if (!userPositionMarker) {
                     const arrowIcon = L.divIcon({ 
-                        className: 'direction-marker-container',
-                        html: '<div class="direction-arrow"></div>',
-                        iconSize: [20, 25],
-                        iconAnchor: [10, 25]
+                        className: 'direction-marker-container', html: '<div class="direction-arrow"></div>',
+                        iconSize: [20, 25], iconAnchor: [10, 25]
                     });
                     userPositionMarker = L.marker(newLatLng, { icon: arrowIcon }).addTo(map);
                     accuracyCircle = L.circle(newLatLng, { radius: accuracy, className: 'direction-accuracy' }).addTo(map);
@@ -171,7 +132,6 @@
                 if (isRecording && currentTrack) {
                     const trackPoints = currentTrack.getLatLngs();
                     let pointAdded = false;
-
                     if (trackPoints.length === 0) { 
                         currentTrack.addLatLng(newLatLng);
                         pointAdded = true;
@@ -182,48 +142,33 @@
                             pointAdded = true;
                         }
                     }
-                    
-                    if (pointAdded) {
-                        saveData();
-                    }
+                    if (pointAdded) { saveData(); }
                 }
             };
             
             window.updateHeadingFromNative = function(heading) {
                 if (userPositionMarker && userPositionMarker.getElement()) {
                     const arrowElement = userPositionMarker.getElement().querySelector('.direction-arrow');
-                    
-                    if (arrowElement) {
-                        arrowElement.style.transform = `rotate(${heading}deg)`;
-                    }
+                    if (arrowElement) { arrowElement.style.transform = `rotate(${heading}deg)`; }
                 }
             };
-
-
-            // --- SECTION 3 : GESTION DES MODES DE CARTE ---
 
             function setMapMode(isOnline) {
                 map.eachLayer(layer => { if (layer instanceof L.ImageOverlay || layer instanceof L.TileLayer) map.removeLayer(layer); });
                 if (!map.zoomControl) { map.zoomControl = L.control.zoom({position: 'topleft'}).addTo(map); }
                 if (isOnline) { onlineTileLayer.addTo(map); } 
-                else { offlineImageLayer.addTo(map); map.setView([8.477834923197527, -71.66402593560836], 19); }
+                else { offlineImageLayer.addTo(map); map.setView([8.477834923197527, -71.66402593560836], 20); }
                 localStorage.setItem('mapMode', isOnline ? 'online' : 'offline');
                 mapToggle.checked = isOnline;
             }
             mapToggle.addEventListener('change', function() { setMapMode(this.checked); });
             
-
-            // --- SECTION 4 : LOGIQUE D'ENREGISTREMENT ET DE CONTRÔLE ---
-
             toggleRecordBtn.addEventListener('click', function() {
                 isRecording = !isRecording;
                 this.textContent = isRecording ? 'Detener Grabación' : 'Iniciar Grabación';
                 this.style.backgroundColor = isRecording ? '#dc3545' : '#007BFF';
 
                 if (isRecording) {
-                    if (window.Android && typeof window.Android.startNativeUpdates === 'function') {
-                        window.Android.startNativeUpdates();
-                    }
                     startNewTrack();
                     if (userPositionMarker) {
                         map.flyTo(userPositionMarker.getLatLng(), 18);
@@ -232,9 +177,6 @@
                         showNotification('Grabación iniciada. Esperando señal GPS...');
                     }
                 } else {
-                    if (window.Android && typeof window.Android.stopNativeUpdates === 'function') {
-                        window.Android.stopNativeUpdates();
-                    }
                     const trackToFinalize = currentTrack;
                     currentTrack = null;
 
@@ -251,68 +193,49 @@
                             const oldTrackItem = recordedItems.find(item => item.layer === trackToFinalize);
                             if(oldTrackItem) oldTrackItem.layer = polygon;
                             map.removeLayer(trackToFinalize);
-                            showNotification('Polygon creado y simplificado.');
-
+                            showNotification('Polígono creado y simplificado.');
                         } else {
                             const simplifiedLinePoints = intelligentSimplify(points);
                             trackToFinalize.setLatLngs(simplifiedLinePoints);
                             showNotification('Recorrido finalizado y procesado.');
                         }
-                        
                     } else if (trackToFinalize) {
                         const itemToRemove = recordedItems.pop();
                         if (itemToRemove) map.removeLayer(itemToRemove.layer);
                         updateItemList();
                         showNotification('Grabación detenida. Recorrido demasiado corto.', 'error');
                     }
-                    
                     saveData();
                 }
             });
 
             function intelligentSimplify(points) {
                 if (points.length < 4) return points;
-
                 const tolerances = [5, 3, 2, 1.5, 1]; 
-
                 for (const tolerance of tolerances) {
                     const simplifiedPoints = L.LineUtil.simplify(points, tolerance);
-                    
                     if (simplifiedPoints.length >= 4) {
-                        console.log(`Trazado simplificado con tolerancia de ${tolerance}m.`);
-                        showNotification(`Trazado simplificado con tolerancia de ${tolerance}m.`);
+                        showNotification(`Recorrido simplificado con una tolerancia de ${tolerance}m.`);
                         return simplifiedPoints;
                     }
                 }
-                
-                showNotification('Trazado intacto (no se pudo simplificar).');
+                showNotification('Detalle del trazado conservado (simplificación no aplicable).');
                 return points;
             }
 
             function startNewTrack() { const id = `track-${++itemIdCounter}`; const trackName = `Recorrido ${itemIdCounter}`; currentTrack = L.polyline([], { color: 'red', weight: 4 }).addTo(map); recordedItems.push({ id, name: trackName, type: 'track', layer: currentTrack }); updateItemList(); }
             addPointBtn.addEventListener('click', function() { if (!userPositionMarker) return showNotification('Posición no encontrada.', 'error'); map.flyTo(userPositionMarker.getLatLng(), 18); const id = `point-${++itemIdCounter}`; const pointName = `Punto ${itemIdCounter}`; const latlng = userPositionMarker.getLatLng(); const point = L.marker(latlng).addTo(map).bindPopup(pointName); recordedItems.push({ id, name: pointName, type: 'point', layer: point }); updateItemList(); saveData(); showNotification(`Nuevo punto creado: ${pointName}`); });
 
-            
-            // --- SECTION 5 : GESTION DES DONNÉES ET DE L'INTERFACE ---
-
             deleteAllBtn.addEventListener('click', function() {
-                if (recordedItems.length === 0) {
-                    return showNotification('No hay nada que borrar.', 'error');
-                }
-                recordedItems.forEach(item => {
-                    if (item.layer && map.hasLayer(item.layer)) {
-                        map.removeLayer(item.layer);
-                    }
-                });
-                recordedItems = [];
-                itemIdCounter = 0;
-                updateItemList();
-                saveData();
+                if (recordedItems.length === 0) return showNotification('No hay nada que borrar.', 'error');
+                recordedItems.forEach(item => { if (item.layer && map.hasLayer(item.layer)) map.removeLayer(item.layer); });
+                recordedItems = []; itemIdCounter = 0;
+                updateItemList(); saveData();
                 showNotification('Todos los elementos han sido borrados.');
             });
             
             function saveData() { const savableItems = recordedItems.map(item => { const data = { id: item.id, name: item.name, type: item.type, coords: null }; if (item.type === 'point' && item.layer && typeof item.layer.getLatLng === 'function') { data.coords = item.layer.getLatLng(); } else if (item.type === 'track' && item.layer && typeof item.layer.getLatLngs === 'function') { data.coords = item.layer.getLatLngs(); } return data; }); localStorage.setItem('geoTrackerData', JSON.stringify(savableItems)); }
-            function loadData() { const savedData = localStorage.getItem('geoTrackerData'); if (!savedData) return; try { const parsedItems = JSON.parse(savedData); let maxId = 0; parsedItems.forEach(savedItem => { let layer = null; if (!savedItem.coords) return; if (savedItem.type === 'point' && savedItem.coords.lat != null && savedItem.coords.lng != null) { layer = L.marker(savedItem.coords).addTo(map).bindPopup(savedItem.name); } else if (savedItem.type === 'track' && Array.isArray(savedItem.coords)) { const points = savedItem.coords.map(c => L.latLng(c.lat, c.lng)); if (points.length === 0) return; if (points.length > 2 && points[0].equals(points[points.length - 1])) { layer = L.polygon(points, { color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2 }).addTo(map); } else { layer = L.polyline(points, { color: 'red', weight: 4 }).addTo(map); } } if (layer) { recordedItems.push({ id: savedItem.id, name: savedItem.name, type: savedItem.type, layer: layer }); const idNum = parseInt(savedItem.id.split('-')[1]); if (idNum > maxId) maxId = idNum; } }); itemIdCounter = maxId; updateItemList(); } catch (e) { console.error("Erreur lors du chargement des données locales :", e); localStorage.removeItem('geoTrackerData'); } }
+            function loadData() { const savedData = localStorage.getItem('geoTrackerData'); if (!savedData) return; try { const parsedItems = JSON.parse(savedData); let maxId = 0; parsedItems.forEach(savedItem => { let layer = null; if (!savedItem.coords) return; if (savedItem.type === 'point' && savedItem.coords.lat != null && savedItem.coords.lng != null) { layer = L.marker(savedItem.coords).addTo(map).bindPopup(savedItem.name); } else if (savedItem.type === 'track' && Array.isArray(savedItem.coords)) { const points = savedItem.coords.map(c => L.latLng(c.lat, c.lng)); if (points.length === 0) return; if (points.length > 2 && points[0].equals(points[points.length - 1])) { layer = L.polygon(points, { color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2 }).addTo(map); } else { layer = L.polyline(points, { color: 'red', weight: 4 }).addTo(map); } } if (layer) { recordedItems.push({ id: savedItem.id, name: savedItem.name, type: savedItem.type, layer: layer }); const idNum = parseInt(savedItem.id.split('-')[1]); if (idNum > maxId) maxId = idNum; } }); itemIdCounter = maxId; updateItemList(); } catch (e) { console.error("Error al cargar los datos locales:", e); localStorage.removeItem('geoTrackerData'); } }
             function showNotification(message, type = 'success') { const notif = document.createElement('div'); notif.className = `toast-notification ${type}`; notif.textContent = message; notificationContainer.appendChild(notif); requestAnimationFrame(() => notif.classList.add('show')); setTimeout(() => { notif.classList.remove('show'); notif.addEventListener('transitionend', () => notif.remove(), { once: true }); }, 3500); }
             function updateItemList() { itemList.innerHTML = ''; recordedItems.forEach(item => { const li = document.createElement('li'); li.dataset.itemId = item.id; const nameSpan = document.createElement('span'); nameSpan.className = 'item-name'; nameSpan.textContent = item.name; const actionsDiv = document.createElement('div'); actionsDiv.className = 'item-actions'; const renameBtn = document.createElement('button'); renameBtn.innerHTML = '✏️'; renameBtn.className = 'rename-btn'; renameBtn.title = 'Renombrar'; const deleteBtn = document.createElement('button'); deleteBtn.innerHTML = '🗑️'; deleteBtn.className = 'delete-btn'; deleteBtn.title = 'Borrar'; actionsDiv.appendChild(renameBtn); actionsDiv.appendChild(deleteBtn); li.appendChild(nameSpan); li.appendChild(actionsDiv); itemList.appendChild(li); }); }
             
@@ -372,7 +295,6 @@
                 return kml;
             }
             
-            // --- DÉMARRAGE DE L'APPLICATION ---
             setMapMode(false);
             loadData();
         });
