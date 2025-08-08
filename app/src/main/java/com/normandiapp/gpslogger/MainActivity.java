@@ -1,5 +1,3 @@
-// FICHIER : MainActivity.java (VERSION TOUJOURS ACTIVE)
-
 package com.normandiapp.gpslogger;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -13,9 +11,19 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
+import android.widget.Toast;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -37,13 +45,11 @@ public class MainActivity extends AppCompatActivity {
         setupReceiver();
         requestLocationPermissions();
         
-        // On démarre le service dès le lancement de l'application
         startLocationService();
     }
     
     @Override
     protected void onDestroy() {
-        // On arrête le service quand l'application est complètement fermée
         stopLocationService();
         super.onDestroy();
     }
@@ -102,10 +108,32 @@ public class MainActivity extends AppCompatActivity {
         Context mContext;
         WebAppInterface(Context c) { mContext = c; }
 
-        // La fonction de partage KML reste identique
         @JavascriptInterface
         public void shareKml(String kmlContent, String fileName) {
-            // ... (logique de partage avec Uri.fromFile, qui est correcte et inchangée)
+            File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            File file = new File(path, fileName);
+
+            try {
+                if (!path.exists()) {
+                    path.mkdirs();
+                }
+                FileWriter writer = new FileWriter(file);
+                writer.append(kmlContent);
+                writer.flush();
+                writer.close();
+
+                Uri fileUri = Uri.fromFile(file);
+
+                Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                shareIntent.setType("application/vnd.google-earth.kml+xml");
+                shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+                
+                startActivity(Intent.createChooser(shareIntent, "Compartir archivo KML"));
+
+            } catch (IOException e) {
+                e.printStackTrace();
+                runOnUiThread(() -> Toast.makeText(mContext, "Error al guardar el archivo KML.", Toast.LENGTH_SHORT).show());
+            }
         }
     }
 }
