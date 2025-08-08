@@ -4,7 +4,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.core.content.FileProvider; // L'IMPORT MANQUANT EST AJOUTÉ ICI
+import androidx.core.content.FileProvider;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import android.Manifest;
@@ -123,16 +123,19 @@ public class MainActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void shareKml(String kmlContent, String fileName) {
-            File path = new File(mContext.getCacheDir(), "kml_files");
-            if (!path.exists()) {
-                path.mkdirs();
-            }
-            File file = new File(path, fileName);
             try {
+                File cachePath = new File(mContext.getCacheDir(), "kml_files");
+                if (!cachePath.exists()) {
+                    cachePath.mkdirs();
+                }
+                File file = new File(cachePath, fileName);
+                
                 FileOutputStream stream = new FileOutputStream(file);
                 stream.write(kmlContent.getBytes());
                 stream.close();
+
                 Uri contentUri = FileProvider.getUriForFile(mContext, "com.normandiapp.gpslogger.provider", file);
+
                 if (contentUri != null) {
                     Intent shareIntent = new Intent();
                     shareIntent.setAction(Intent.ACTION_SEND);
@@ -140,4 +143,14 @@ public class MainActivity extends AppCompatActivity {
                     shareIntent.setDataAndType(contentUri, getContentResolver().getType(contentUri));
                     shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
                     startActivity(Intent.createChooser(shareIntent, "Compartir archivo KML"));
-    
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+                runOnUiThread(() -> Toast.makeText(mContext, "Error al guardar el archivo KML.", Toast.LENGTH_SHORT).show());
+            } catch (IllegalArgumentException e) {
+                e.printStackTrace();
+                runOnUiThread(() -> Toast.makeText(mContext, "Error de configuración del FileProvider.", Toast.LENGTH_LONG).show());
+            }
+        }
+    }
+}
