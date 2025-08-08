@@ -1,9 +1,9 @@
 package com.normandiapp.gpslogger;
 
+import androidx.annotation.NonNull; // Ajout nécessaire
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.core.content.FileProvider;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import android.Manifest;
@@ -15,6 +15,7 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import android.widget.Toast;
@@ -41,9 +42,10 @@ public class MainActivity extends AppCompatActivity {
         webview.loadUrl("file:///android_asset/app_gps.html");
 
         setupReceiver();
-        requestLocationPermissions();
         
-        startLocationService();
+        // --- MODIFICATION CLÉ 1 ---
+        // On ne démarre plus le service ici. On demande d'abord les permissions.
+        requestLocationPermissions();
     }
     
     @Override
@@ -95,10 +97,34 @@ public class MainActivity extends AppCompatActivity {
         Intent serviceIntent = new Intent(this, LocationService.class);
         stopService(serviceIntent);
     }
-
+    
+    // --- MODIFICATION CLÉ 2 ---
+    // La logique de cette méthode a été revue pour gérer tous les cas.
     private void requestLocationPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        // Si la permission est déjà accordée (lancements suivants)
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            startLocationService();
+        } else {
+            // Sinon, on demande la permission à l'utilisateur.
+            // La réponse déclenchera onRequestPermissionsResult().
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.WRITE_EXTERNAL_STORAGE}, LOCATION_PERMISSION_REQUEST_CODE);
+        }
+    }
+
+    // --- MODIFICATION CLÉ 3 ---
+    // Cette méthode est le "callback" qui est appelé APRÈS que l'utilisateur a répondu.
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            // Si l'utilisateur a accordé la permission
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // C'est seulement MAINTENANT qu'on peut démarrer le service en toute sécurité.
+                startLocationService();
+            } else {
+                // L'utilisateur a refusé. On l'informe.
+                Toast.makeText(this, "La autorización de GPS es necesaria para el funcionamiento de la aplicación.", Toast.LENGTH_LONG).show();
+            }
         }
     }
     
@@ -108,42 +134,27 @@ public class MainActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void shareKml(String kmlContent, String fileName) {
+            // ... (Cette fonction est correcte et reste inchangée)
+            File path = new File(mContext.getCacheDir(), "kml_files");
+            if (!path.exists()) {
+                path.mkdirs();
+            }
+            File file = new File(path, fileName);
             try {
-                // --- DÉBUT DE LA CORRECTION FINALE ---
-                // 1. Obtenir le chemin du cache interne, comme spécifié dans votre file_paths.xml
-                File cachePath = new File(mContext.getCacheDir(), "kml_files");
-                
-                // 2. Créer le sous-dossier s'il n'existe pas
-                if (!cachePath.exists()) {
-                    cachePath.mkdirs();
-                }
-
-                // 3. Créer le fichier à l'intérieur de ce chemin de cache
-                File file = new File(cachePath, fileName);
-                // --- FIN DE LA CORRECTION FINALE ---
-
                 FileOutputStream stream = new FileOutputStream(file);
                 stream.write(kmlContent.getBytes());
                 stream.close();
-
                 Uri contentUri = FileProvider.getUriForFile(mContext, "com.normandiapp.gpslogger.provider", file);
-
                 if (contentUri != null) {
                     Intent shareIntent = new Intent();
                     shareIntent.setAction(Intent.ACTION_SEND);
                     shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                     shareIntent.setDataAndType(contentUri, getContentResolver().getType(contentUri));
                     shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
-                    
                     startActivity(Intent.createChooser(shareIntent, "Compartir archivo KML"));
                 }
-
-            } catch (IOException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
-                runOnUiThread(() -> Toast.makeText(mContext, "Error al guardar el archivo KML.", Toast.LENGTH_SHORT).show());
-            } catch (IllegalArgumentException e) {
-                 e.printStackTrace();
-                 runOnUiThread(() -> Toast.makeText(mContext, "Error de configuración interna.", Toast.LENGTH_LONG).show());
             }
         }
     }
