@@ -1,9 +1,10 @@
 package com.normandiapp.gpslogger;
 
-import androidx.annotation.NonNull; // Ajout nécessaire
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider; // L'IMPORT MANQUANT EST AJOUTÉ ICI
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import android.Manifest;
@@ -43,8 +44,6 @@ public class MainActivity extends AppCompatActivity {
 
         setupReceiver();
         
-        // --- MODIFICATION CLÉ 1 ---
-        // On ne démarre plus le service ici. On demande d'abord les permissions.
         requestLocationPermissions();
     }
     
@@ -98,31 +97,21 @@ public class MainActivity extends AppCompatActivity {
         stopService(serviceIntent);
     }
     
-    // --- MODIFICATION CLÉ 2 ---
-    // La logique de cette méthode a été revue pour gérer tous les cas.
     private void requestLocationPermissions() {
-        // Si la permission est déjà accordée (lancements suivants)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             startLocationService();
         } else {
-            // Sinon, on demande la permission à l'utilisateur.
-            // La réponse déclenchera onRequestPermissionsResult().
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.WRITE_EXTERNAL_STORAGE}, LOCATION_PERMISSION_REQUEST_CODE);
         }
     }
 
-    // --- MODIFICATION CLÉ 3 ---
-    // Cette méthode est le "callback" qui est appelé APRÈS que l'utilisateur a répondu.
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
-            // Si l'utilisateur a accordé la permission
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // C'est seulement MAINTENANT qu'on peut démarrer le service en toute sécurité.
                 startLocationService();
             } else {
-                // L'utilisateur a refusé. On l'informe.
                 Toast.makeText(this, "La autorización de GPS es necesaria para el funcionamiento de la aplicación.", Toast.LENGTH_LONG).show();
             }
         }
@@ -134,7 +123,6 @@ public class MainActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void shareKml(String kmlContent, String fileName) {
-            // ... (Cette fonction est correcte et reste inchangée)
             File path = new File(mContext.getCacheDir(), "kml_files");
             if (!path.exists()) {
                 path.mkdirs();
@@ -152,10 +140,4 @@ public class MainActivity extends AppCompatActivity {
                     shareIntent.setDataAndType(contentUri, getContentResolver().getType(contentUri));
                     shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
                     startActivity(Intent.createChooser(shareIntent, "Compartir archivo KML"));
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-}
+    
