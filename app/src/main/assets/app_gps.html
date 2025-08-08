@@ -243,17 +243,27 @@
                 }
             });
 
-            function intelligentSimplify(points) {
-                if (points.length < 3) return points;
-                const tolerances = [20, 10, 5, 3, 2, 1];
+function intelligentSimplify(points) {
+                // Pour un polygone, il faut au moins 4 points (ex: A, B, C, A)
+                if (points.length < 4) return points;
+
+                // --- CONFIGURATION OPTIMALE POUR DES PARCOURS COURTS ET DÉTAILLÉS ---
+                // On commence par une simplification modérée et on augmente la précision.
+                const tolerances = [5, 3, 2, 1.5, 1.25, 1]; 
+
                 for (const tolerance of tolerances) {
                     const simplifiedPoints = L.LineUtil.simplify(points, tolerance);
-                    if (simplifiedPoints.length >= 3 || simplifiedPoints.length > points.length * 0.1) {
+
+                    // On accepte la simplification si elle conserve au moins 4 points.
+                    if (simplifiedPoints.length >= 4) {
                         console.log(`Trazado simplificado con tolerancia de ${tolerance}m.`);
+                        showNotification(`Trazado simplificado con tolerancia de ${tolerance}m.`);
                         return simplifiedPoints;
                     }
                 }
-                showNotification('Detalle del trazado conservado.');
+
+                // Si aucune simplification n'a fonctionné, on garde tout.
+                showNotification('Trazado intacto (no se pudo simplificar).');
                 return points;
             }
 
@@ -355,4 +365,5 @@ function generateKML() {
     </script>
 </body>
 </html>
+
 
