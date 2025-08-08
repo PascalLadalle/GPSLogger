@@ -152,10 +152,9 @@
 
             // --- SECTION 2 : "PONT" NATIF <-> WEB ---
 
-window.updatePositionFromNative = function(lat, lng, accuracy) {
+            window.updatePositionFromNative = function(lat, lng, accuracy) {
                 const newLatLng = L.latLng(lat, lng);
                 if (!userPositionMarker) {
-                    // (Le code de création du marqueur reste identique)
                     const arrowIcon = L.divIcon({ 
                         className: 'direction-marker-container',
                         html: '<div class="direction-arrow"></div>',
@@ -169,10 +168,9 @@ window.updatePositionFromNative = function(lat, lng, accuracy) {
                     accuracyCircle.setLatLng(newLatLng).setRadius(accuracy);
                 }
 
-                // --- DÉBUT DE LA MODIFICATION ---
                 if (isRecording && currentTrack) {
                     const trackPoints = currentTrack.getLatLngs();
-                    let pointAdded = false; // On utilise un drapeau pour savoir si on doit sauvegarder
+                    let pointAdded = false;
 
                     if (trackPoints.length === 0) { 
                         currentTrack.addLatLng(newLatLng);
@@ -184,15 +182,14 @@ window.updatePositionFromNative = function(lat, lng, accuracy) {
                             pointAdded = true;
                         }
                     }
-
-                    // Si un nouveau point a été ajouté au tracé, on sauvegarde TOUT l'état.
+                    
                     if (pointAdded) {
                         saveData();
                     }
                 }
-                // --- FIN DE LA MODIFICATION ---
             };
-window.updateHeadingFromNative = function(heading) {
+            
+            window.updateHeadingFromNative = function(heading) {
                 if (userPositionMarker && userPositionMarker.getElement()) {
                     const arrowElement = userPositionMarker.getElement().querySelector('.direction-arrow');
                     
@@ -201,13 +198,15 @@ window.updateHeadingFromNative = function(heading) {
                     }
                 }
             };
+
+
             // --- SECTION 3 : GESTION DES MODES DE CARTE ---
 
             function setMapMode(isOnline) {
                 map.eachLayer(layer => { if (layer instanceof L.ImageOverlay || layer instanceof L.TileLayer) map.removeLayer(layer); });
                 if (!map.zoomControl) { map.zoomControl = L.control.zoom({position: 'topleft'}).addTo(map); }
                 if (isOnline) { onlineTileLayer.addTo(map); } 
-                else { offlineImageLayer.addTo(map); map.setView([8.477834923197527, -71.66402593560836], 20); }
+                else { offlineImageLayer.addTo(map); map.setView([8.477834923197527, -71.66402593560836], 19); }
                 localStorage.setItem('mapMode', isOnline ? 'online' : 'offline');
                 mapToggle.checked = isOnline;
             }
@@ -222,6 +221,9 @@ window.updateHeadingFromNative = function(heading) {
                 this.style.backgroundColor = isRecording ? '#dc3545' : '#007BFF';
 
                 if (isRecording) {
+                    if (window.Android && typeof window.Android.startNativeUpdates === 'function') {
+                        window.Android.startNativeUpdates();
+                    }
                     startNewTrack();
                     if (userPositionMarker) {
                         map.flyTo(userPositionMarker.getLatLng(), 18);
@@ -230,82 +232,59 @@ window.updateHeadingFromNative = function(heading) {
                         showNotification('Grabación iniciada. Esperando señal GPS...');
                     }
                 } else {
-                    // --- DÉBUT DE LA LOGIQUE CORRIGÉE ---
+                    if (window.Android && typeof window.Android.stopNativeUpdates === 'function') {
+                        window.Android.stopNativeUpdates();
+                    }
                     const trackToFinalize = currentTrack;
                     currentTrack = null;
 
                     if (trackToFinalize && trackToFinalize.getLatLngs().length > 2) {
-                        // 1. On récupère les points bruts UNE SEULE FOIS.
                         let points = trackToFinalize.getLatLngs();
-
-                        // 2. ON VÉRIFIE LA FERMETURE SUR LES DONNÉES BRUTES AVANT TOUT.
                         const firstPoint = points[0];
                         const lastPoint = points[points.length - 1];
                         const isClosedLoop = firstPoint.distanceTo(lastPoint) < 5;
 
                         if (isClosedLoop) {
-                            // C'EST UN POLYGONE
-                            // 3a. On s'assure que la boucle est bien fermée pour la simplification.
                             points.push(firstPoint);
-                            
-                            // 4a. On simplifie le tracé maintenant qu'il est fermé.
                             const simplifiedPolygonPoints = intelligentSimplify(points);
-                            
-                            // 5a. On crée le nouveau polygone à partir des points simplifiés.
                             const polygon = L.polygon(simplifiedPolygonPoints, {color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2}).addTo(map);
-                            
-                            // 6a. On met à jour notre liste de données.
                             const oldTrackItem = recordedItems.find(item => item.layer === trackToFinalize);
                             if(oldTrackItem) oldTrackItem.layer = polygon;
-                            
-                            // 7a. On supprime l'ancienne ligne de la carte.
                             map.removeLayer(trackToFinalize);
-                            showNotification('Polygone créé et simplifié.');
+                            showNotification('Polygon creado y simplificado.');
 
                         } else {
-                            // C'EST UNE SIMPLE LIGNE
-                            // 3b. On simplifie la ligne ouverte.
                             const simplifiedLinePoints = intelligentSimplify(points);
-                            
-                            // 4b. On met à jour la ligne existante avec les points simplifiés.
                             trackToFinalize.setLatLngs(simplifiedLinePoints);
                             showNotification('Recorrido finalizado y procesado.');
                         }
                         
                     } else if (trackToFinalize) {
-                        // Logique pour les tracés trop courts (inchangée et correcte)
                         const itemToRemove = recordedItems.pop();
                         if (itemToRemove) map.removeLayer(itemToRemove.layer);
                         updateItemList();
                         showNotification('Grabación detenida. Recorrido demasiado corto.', 'error');
                     }
                     
-                    // On sauvegarde le résultat final.
                     saveData();
-                    // --- FIN DE LA LOGIQUE CORRIGÉE ---
                 }
             });
-            
-function intelligentSimplify(points) {
-                // Pour un polygone, il faut au moins 4 points (ex: A, B, C, A)
+
+            function intelligentSimplify(points) {
                 if (points.length < 4) return points;
 
-                // --- CONFIGURATION OPTIMALE POUR DES PARCOURS COURTS ET DÉTAILLÉS ---
-                // On commence par une simplification modérée et on augmente la précision.
-                const tolerances = [5, 3, 2, 1.5, 1.25, 1]; 
+                const tolerances = [5, 3, 2, 1.5, 1]; 
 
                 for (const tolerance of tolerances) {
                     const simplifiedPoints = L.LineUtil.simplify(points, tolerance);
-
-                    // On accepte la simplification si elle conserve au moins 4 points.
+                    
                     if (simplifiedPoints.length >= 4) {
                         console.log(`Trazado simplificado con tolerancia de ${tolerance}m.`);
                         showNotification(`Trazado simplificado con tolerancia de ${tolerance}m.`);
                         return simplifiedPoints;
                     }
                 }
-
-                // Si aucune simplification n'a fonctionné, on garde tout.
+                
                 showNotification('Trazado intacto (no se pudo simplificar).');
                 return points;
             }
@@ -357,7 +336,7 @@ function intelligentSimplify(points) {
                 }
             });
 
-function generateKML() {
+            function generateKML() {
                 let kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n    <name>Datos del mapa interactivo</name>\n    <description>Exportado desde la aplicación web</description>\n`;
                 recordedItems.forEach(item => {
                     const safeName = item.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -368,24 +347,17 @@ function generateKML() {
                     kml += `          <Data name="comment"><value></value></Data>\n`;
                     kml += `          <Data name="color"><value>#A9A9A9</value></Data>\n`;
                     kml += `        </ExtendedData>\n`;
-                    
                     if (item.type === 'point') {
                         const coords = item.layer.getLatLng();
                         kml += `        <Point>\n          <coordinates>${coords.lng},${coords.lat},0</coordinates>\n        </Point>\n`;
-                    
                     } else if (item.type === 'track') {
-                        // --- DÉBUT DE LA CORRECTION ---
-
-                        // On vérifie si la couche est un Polygone
                         if (item.layer instanceof L.Polygon) {
-                            // On récupère le contour extérieur (premier tableau)
                             const polygonPoints = item.layer.getLatLngs()[0]; 
                             if (polygonPoints.length > 2) {
                                 const coordsString = polygonPoints.map(p => `${p.lng},${p.lat},0`).join(' ');
                                 kml += `        <Polygon>\n          <outerBoundaryIs>\n            <LinearRing>\n              <coordinates>${coordsString}</coordinates>\n            </LinearRing>\n          </outerBoundaryIs>\n        </Polygon>\n`;
                             }
                         } 
-                        // Sinon, c'est une Polyligne
                         else if (item.layer instanceof L.Polyline) { 
                             const linePoints = item.layer.getLatLngs();
                             if (linePoints.length > 1) {
@@ -393,22 +365,17 @@ function generateKML() {
                                 kml += `        <LineString>\n          <coordinates>${coordsString}</coordinates>\n        </LineString>\n`;
                             }
                         }
-                        // --- FIN DE LA CORRECTION ---
                     }
                     kml += `      </Placemark>\n`;
                 });
                 kml += `  </Document>\n</kml>`;
                 return kml;
-            }            
+            }
+            
             // --- DÉMARRAGE DE L'APPLICATION ---
-// --- DÉMARRAGE DE L'APPLICATION (MODIFIÉ) ---
-            setMapMode(false); 
+            setMapMode(false);
             loadData();
         });
     </script>
 </body>
 </html>
-
-
-
-
