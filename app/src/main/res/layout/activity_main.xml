@@ -14,5 +14,25 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
+   
+    <TextView
+        android:id="@+id/latitude_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Latitud:"
+        app:layout_constraintBottom_toTopOf="@+id/longitude_label"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/button" />
+
+    <TextView
+        android:id="@+id/longitude_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Longitud:"
+        app:layout_constraintBottom_toTopOf="@+id/track_list"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/latitude_label" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
