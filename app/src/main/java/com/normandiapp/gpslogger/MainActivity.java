@@ -15,6 +15,7 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.net.Uri;
+import android.os.Build; // Ajout nécessaire
 import android.os.Bundle;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
@@ -23,6 +24,7 @@ import android.widget.Toast;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList; // Ajout nécessaire
 
 public class MainActivity extends AppCompatActivity {
 
@@ -61,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
                     double lng = intent.getDoubleExtra(LocationService.EXTRA_LONGITUDE, 0);
                     float accuracy = intent.getFloatExtra(LocationService.EXTRA_ACCURACY, 0);
                     float heading = intent.getFloatExtra(LocationService.EXTRA_HEADING, 0);
+
                     String script = String.format(java.util.Locale.US, "window.updatePositionFromNative(%f, %f, %f);", lat, lng, accuracy);
                     webview.post(() -> webview.evaluateJavascript(script, null));
 
@@ -95,19 +98,30 @@ public class MainActivity extends AppCompatActivity {
         stopService(serviceIntent);
     }
     
+    // --- MODIFICATION CLÉ ---
+    // Cette méthode demande maintenant la permission de notifier sur les versions récentes d'Android.
     private void requestLocationPermissions() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             startLocationService();
         } else {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.WRITE_EXTERNAL_STORAGE}, LOCATION_PERMISSION_REQUEST_CODE);
+            ArrayList<String> permissionsToRequest = new ArrayList<>();
+            permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION);
+            permissionsToRequest.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+
+            // Sur Android 13 (API 33) et plus, on doit demander la permission de notifier.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS);
+            }
+
+            ActivityCompat.requestPermissions(this, permissionsToRequest.toArray(new String[0]), LOCATION_PERMISSION_REQUEST_CODE);
         }
     }
 
-    // --- CORRECTION 1: Rétablissement du "callback" de la demande de permission ---
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            // On vérifie spécifiquement si la permission de localisation a été accordée pour démarrer le service.
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startLocationService();
             } else {
@@ -133,7 +147,6 @@ public class MainActivity extends AppCompatActivity {
                 stream.write(kmlContent.getBytes());
                 stream.close();
 
-                // --- CORRECTION 2: Construction dynamique de l'autorité pour FileProvider ---
                 String authority = mContext.getPackageName() + ".provider";
                 Uri contentUri = FileProvider.getUriForFile(mContext, authority, file);
 
@@ -150,7 +163,7 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(() -> Toast.makeText(mContext, "Error al guardar el archivo KML.", Toast.LENGTH_SHORT).show());
             } catch (IllegalArgumentException e) {
                 e.printStackTrace();
-                runOnUiThread(() -> Toast.makeText(mContext, "Error interna.", Toast.LENGTH_LONG).show());
+                runOnUiThread(() -> Toast.makeText(mContext, "Error de configuración del FileProvider.", Toast.LENGTH_LONG).show());
             }
         }
     }
