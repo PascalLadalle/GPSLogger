@@ -1,5 +1,3 @@
-// Archivo: MainActivity.java (SIN CAMBIOS, YA ESTÁ CORRECTO)
-
 package com.normandiapp.gpslogger;
 
 import androidx.annotation.NonNull;
