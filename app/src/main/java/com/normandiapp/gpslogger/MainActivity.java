@@ -17,7 +17,7 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-// AJOUTÉ : Imports pour FusedLocationProviderClient
+// Imports nécessaires pour FusedLocationProviderClient
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
@@ -27,18 +27,22 @@ import com.google.android.gms.location.Priority;
 
 import java.util.ArrayList;
 
-// MODIFIÉ : L'activité n'implémente plus LocationListener
+// Note: Il n'est PAS nécessaire d'importer Point ou Track car ils sont dans le même package.
+// public class MainActivity extends AppCompatActivity implements LocationListener { <-- L'implémentation a été supprimée
+
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private static final int PERMISSION_REQUEST_CODE = 1;
 
-    // MODIFIÉ : Remplacement du LocationManager
+    // Nouvelles variables pour FusedLocationProviderClient
     private FusedLocationProviderClient fusedLocationProviderClient;
     private LocationCallback locationCallback;
 
+    // Variables d'état de l'application (inchangées)
     private Track currentTrack = null;
     private Boolean isLogging = false;
 
+    // Vues de l'interface utilisateur (inchangées)
     private Button button;
     private TextView latitudeLabel;
     private TextView longitudeLabel;
@@ -46,6 +50,7 @@ public class MainActivity extends AppCompatActivity {
     private ArrayAdapter<String> trackAdapter;
     private ArrayList<String> trackTitles;
 
+    // Constantes (inchangées)
     private static final long UPDATE_INTERVAL = 3000;
     private static final long MINIMUM_DISTANCE = 5;
 
@@ -59,7 +64,6 @@ public class MainActivity extends AppCompatActivity {
         longitudeLabel = findViewById(R.id.longitude_label);
         trackList = findViewById(R.id.track_list);
 
-        // AJOUTÉ : Initialisation du FusedLocationProviderClient
         fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
 
         button.setOnClickListener(new View.OnClickListener() {
@@ -91,9 +95,8 @@ public class MainActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.d(TAG, "Permiso concedido");
+                Log.d(TAG, "Permissions granted");
             } else {
-                // MODIFIÉ : Texte en espagnol
                 Toast.makeText(this, "Se requieren permisos para usar esta aplicación", Toast.LENGTH_SHORT).show();
             }
         }
@@ -101,7 +104,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void startLogging() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // MODIFIÉ : Texte en espagnol
             Toast.makeText(this, "Permiso de ubicación no concedido", Toast.LENGTH_SHORT).show();
             requestPermissions();
             return;
@@ -110,12 +112,12 @@ public class MainActivity extends AppCompatActivity {
         currentTrack = new Track();
         isLogging = true;
         button.setText(R.string.stop_logging);
-
-        // MODIFIÉ : Création de la LocationRequest et du LocationCallback
+        
+        // Création de la LocationRequest (syntaxe corrigée)
         LocationRequest locationRequest = new LocationRequest.Builder(UPDATE_INTERVAL)
-        .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
-        .setMinUpdateDistanceMeters(MINIMUM_DISTANCE)
-        .build();
+                .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
+                .setMinUpdateDistanceMeters(MINIMUM_DISTANCE)
+                .build();
 
         locationCallback = new LocationCallback() {
             @Override
@@ -123,8 +125,9 @@ public class MainActivity extends AppCompatActivity {
                 super.onLocationResult(locationResult);
                 for (Location location : locationResult.getLocations()) {
                     if (location != null) {
-                        Log.d(TAG, "Cambio de ubicacion: " + location.getLatitude() + ", " + location.getLongitude());
+                        Log.d(TAG, "Location Changed: " + location.getLatitude() + ", " + location.getLongitude());
 
+                        // Logique originale de création de point (fonctionne car le conflit est résolu)
                         Point point = new Point();
                         point.setLatitude(location.getLatitude());
                         point.setLongitude(location.getLongitude());
@@ -134,7 +137,6 @@ public class MainActivity extends AppCompatActivity {
 
                         currentTrack.addPoint(point);
 
-                        // MODIFIÉ : Texte en espagnol
                         latitudeLabel.setText(String.format("Latitud: %s", point.getLatitude()));
                         longitudeLabel.setText(String.format("Longitud: %s", point.getLongitude()));
                     }
@@ -151,7 +153,6 @@ public class MainActivity extends AppCompatActivity {
             isLogging = false;
             button.setText(R.string.start_logging);
 
-            // MODIFIÉ : Arrêt des mises à jour via le client
             if (fusedLocationProviderClient != null && locationCallback != null) {
                 fusedLocationProviderClient.removeLocationUpdates(locationCallback);
             }
@@ -165,6 +166,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateTrackList() {
+        // Logique originale d'affichage des traces (fonctionne car le conflit est résolu)
         trackTitles = Track.getTrackTitles(this);
         trackAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, trackTitles);
         trackList.setAdapter(trackAdapter);
