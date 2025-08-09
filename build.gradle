@@ -3,4 +3,10 @@ plugins {
     // MISE À JOUR VERS UNE VERSION COMPATIBLE
     id 'com.android.application' version '8.1.0' apply false
     id 'com.android.library' version '8.1.0' apply false
+
+}
+dependencies {
+    // ... autres dépendances
+    implementation 'com.google.android.gms:play-services-location:21.2.0' // VERSION RECOMMANDÉE
+    // ... autres dépendances
 }
