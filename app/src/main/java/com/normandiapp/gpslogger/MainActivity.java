@@ -61,11 +61,10 @@ public class MainActivity extends AppCompatActivity {
                     double lng = intent.getDoubleExtra(LocationService.EXTRA_LONGITUDE, 0);
                     float accuracy = intent.getFloatExtra(LocationService.EXTRA_ACCURACY, 0);
                     float heading = intent.getFloatExtra(LocationService.EXTRA_HEADING, 0);
-
-                    String script = String.format("window.updatePositionFromNative(%f, %f, %f);", lat, lng, accuracy);
+                    String script = String.format(java.util.Locale.US, "window.updatePositionFromNative(%f, %f, %f);", lat, lng, accuracy);
                     webview.post(() -> webview.evaluateJavascript(script, null));
 
-                    String headingScript = String.format("window.updateHeadingFromNative(%f);", heading);
+                    String headingScript = String.format(java.util.Locale.US, "window.updateHeadingFromNative(%f);", heading);
                     webview.post(() -> webview.evaluateJavascript(headingScript, null));
                 }
             }
