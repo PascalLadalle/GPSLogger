@@ -3,168 +3,170 @@ package com.normandiapp.gpslogger;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-import androidx.core.content.FileProvider;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import android.Manifest;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.Location;
-import android.net.Uri;
-import android.os.Build; // Ajout nécessaire
 import android.os.Bundle;
-import android.webkit.JavascriptInterface;
-import android.webkit.WebView;
+import android.os.Looper;
+import android.util.Log;
+import android.view.View;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.ArrayList; // Ajout nécessaire
+// AJOUTÉ : Imports pour FusedLocationProviderClient
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.Priority;
 
+import java.util.ArrayList;
+
+// MODIFIÉ : L'activité n'implémente plus LocationListener
 public class MainActivity extends AppCompatActivity {
+    private static final String TAG = "MainActivity";
+    private static final int PERMISSION_REQUEST_CODE = 1;
 
-    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
-    private WebView webview;
-    private BroadcastReceiver locationReceiver;
+    // MODIFIÉ : Remplacement du LocationManager
+    private FusedLocationProviderClient fusedLocationProviderClient;
+    private LocationCallback locationCallback;
+
+    private Track currentTrack = null;
+    private Boolean isLogging = false;
+
+    private Button button;
+    private TextView latitudeLabel;
+    private TextView longitudeLabel;
+    private ListView trackList;
+    private ArrayAdapter<String> trackAdapter;
+    private ArrayList<String> trackTitles;
+
+    private static final long UPDATE_INTERVAL = 3000;
+    private static final long MINIMUM_DISTANCE = 5;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        webview = findViewById(R.id.webview);
-        webview.getSettings().setJavaScriptEnabled(true);
-        webview.getSettings().setDomStorageEnabled(true);
-        webview.addJavascriptInterface(new WebAppInterface(this), "Android");
-        webview.loadUrl("file:///android_asset/app_gps.html");
+        button = findViewById(R.id.button);
+        latitudeLabel = findViewById(R.id.latitude_label);
+        longitudeLabel = findViewById(R.id.longitude_label);
+        trackList = findViewById(R.id.track_list);
 
-        setupReceiver();
-        
-        requestLocationPermissions();
-    }
-    
-    @Override
-    protected void onDestroy() {
-        stopLocationService();
-        super.onDestroy();
-    }
+        // AJOUTÉ : Initialisation du FusedLocationProviderClient
+        fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
 
-    private void setupReceiver() {
-        locationReceiver = new BroadcastReceiver() {
+        button.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onReceive(Context context, Intent intent) {
-                if (intent != null && LocationService.ACTION_LOCATION_BROADCAST.equals(intent.getAction())) {
-                    double lat = intent.getDoubleExtra(LocationService.EXTRA_LATITUDE, 0);
-                    double lng = intent.getDoubleExtra(LocationService.EXTRA_LONGITUDE, 0);
-                    float accuracy = intent.getFloatExtra(LocationService.EXTRA_ACCURACY, 0);
-                    float heading = intent.getFloatExtra(LocationService.EXTRA_HEADING, 0);
-
-                    String script = String.format(java.util.Locale.US, "window.updatePositionFromNative(%f, %f, %f);", lat, lng, accuracy);
-                    webview.post(() -> webview.evaluateJavascript(script, null));
-
-                    String headingScript = String.format(java.util.Locale.US, "window.updateHeadingFromNative(%f);", heading);
-                    webview.post(() -> webview.evaluateJavascript(headingScript, null));
+            public void onClick(View v) {
+                if (isLogging) {
+                    stopLogging();
+                } else {
+                    startLogging();
                 }
             }
-        };
+        });
+
+        requestPermissions();
+        updateTrackList();
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        LocalBroadcastManager.getInstance(this).registerReceiver(locationReceiver, new IntentFilter(LocationService.ACTION_LOCATION_BROADCAST));
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(locationReceiver);
-    }
-
-    private void startLocationService() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            Intent serviceIntent = new Intent(this, LocationService.class);
-            ContextCompat.startForegroundService(this, serviceIntent);
-        }
-    }
-
-    private void stopLocationService() {
-        Intent serviceIntent = new Intent(this, LocationService.class);
-        stopService(serviceIntent);
-    }
-    
-    // --- MODIFICATION CLÉ ---
-    // Cette méthode demande maintenant la permission de notifier sur les versions récentes d'Android.
-    private void requestLocationPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            startLocationService();
-        } else {
-            ArrayList<String> permissionsToRequest = new ArrayList<>();
-            permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION);
-            permissionsToRequest.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-
-            // Sur Android 13 (API 33) et plus, on doit demander la permission de notifier.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS);
-            }
-
-            ActivityCompat.requestPermissions(this, permissionsToRequest.toArray(new String[0]), LOCATION_PERMISSION_REQUEST_CODE);
+    private void requestPermissions() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
+                ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    PERMISSION_REQUEST_CODE);
         }
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
-            // On vérifie spécifiquement si la permission de localisation a été accordée pour démarrer le service.
+        if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                startLocationService();
+                Log.d(TAG, "Permiso concedido");
             } else {
-                Toast.makeText(this, "La autorización de GPS es necesaria para el funcionamiento de la aplicación.", Toast.LENGTH_LONG).show();
+                // MODIFIÉ : Texte en espagnol
+                Toast.makeText(this, "Se requieren permisos para usar esta aplicación", Toast.LENGTH_SHORT).show();
             }
         }
     }
-    
-    public class WebAppInterface {
-        Context mContext;
-        WebAppInterface(Context c) { mContext = c; }
 
-        @JavascriptInterface
-        public void shareKml(String kmlContent, String fileName) {
-            try {
-                File cachePath = new File(mContext.getCacheDir(), "kml_files");
-                if (!cachePath.exists()) {
-                    cachePath.mkdirs();
-                }
-                File file = new File(cachePath, fileName);
-                
-                FileOutputStream stream = new FileOutputStream(file);
-                stream.write(kmlContent.getBytes());
-                stream.close();
-
-                String authority = mContext.getPackageName() + ".provider";
-                Uri contentUri = FileProvider.getUriForFile(mContext, authority, file);
-
-                if (contentUri != null) {
-                    Intent shareIntent = new Intent();
-                    shareIntent.setAction(Intent.ACTION_SEND);
-                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    shareIntent.setDataAndType(contentUri, getContentResolver().getType(contentUri));
-                    shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
-                    startActivity(Intent.createChooser(shareIntent, "Compartir archivo KML"));
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-                runOnUiThread(() -> Toast.makeText(mContext, "Error al guardar el archivo KML.", Toast.LENGTH_SHORT).show());
-            } catch (IllegalArgumentException e) {
-                e.printStackTrace();
-                runOnUiThread(() -> Toast.makeText(mContext, "Error de configuración del FileProvider.", Toast.LENGTH_LONG).show());
-            }
+    private void startLogging() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // MODIFIÉ : Texte en espagnol
+            Toast.makeText(this, "Permiso de ubicación no concedido", Toast.LENGTH_SHORT).show();
+            requestPermissions();
+            return;
         }
+
+        currentTrack = new Track();
+        isLogging = true;
+        button.setText(R.string.stop_logging);
+
+        // MODIFIÉ : Création de la LocationRequest et du LocationCallback
+        LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, UPDATE_INTERVAL)
+                .setWaitForAccurateLocation(true)
+                .setMinUpdateDistanceMeters(MINIMUM_DISTANCE)
+                .build();
+
+        locationCallback = new LocationCallback() {
+            @Override
+            public void onLocationResult(@NonNull LocationResult locationResult) {
+                super.onLocationResult(locationResult);
+                for (Location location : locationResult.getLocations()) {
+                    if (location != null) {
+                        Log.d(TAG, "Cambio de ubicacion: " + location.getLatitude() + ", " + location.getLongitude());
+
+                        Point point = new Point();
+                        point.setLatitude(location.getLatitude());
+                        point.setLongitude(location.getLongitude());
+                        point.setAltitude(location.getAltitude());
+                        point.setSpeed(location.getSpeed());
+                        point.setTime(location.getTime());
+
+                        currentTrack.addPoint(point);
+
+                        // MODIFIÉ : Texte en espagnol
+                        latitudeLabel.setText(String.format("Latitud: %s", point.getLatitude()));
+                        longitudeLabel.setText(String.format("Longitud: %s", point.getLongitude()));
+                    }
+                }
+            }
+        };
+
+        // Démarrage des mises à jour
+        fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
+    }
+
+    private void stopLogging() {
+        if (isLogging) {
+            isLogging = false;
+            button.setText(R.string.start_logging);
+
+            // MODIFIÉ : Arrêt des mises à jour via le client
+            if (fusedLocationProviderClient != null && locationCallback != null) {
+                fusedLocationProviderClient.removeLocationUpdates(locationCallback);
+            }
+
+            if (currentTrack != null && currentTrack.getPoints().size() > 0) {
+                currentTrack.saveToFile(this);
+                updateTrackList();
+            }
+            currentTrack = null;
+        }
+    }
+
+    private void updateTrackList() {
+        trackTitles = Track.getTrackTitles(this);
+        trackAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, trackTitles);
+        trackList.setAdapter(trackAdapter);
     }
 }
