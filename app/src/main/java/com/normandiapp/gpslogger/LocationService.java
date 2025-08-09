@@ -1,3 +1,4 @@
+// Archivo: LocationService.java (CORREGIDO CON TEXTOS EN ESPAÑOL)
 package com.normandiapp.gpslogger;
 
 import android.app.Notification;
@@ -132,4 +133,13 @@ public class LocationService extends Service {
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) {
                 manager.createNotificationChannel(serviceChannel);
-        
+            }
+        }
+    }
+
+    @Nullable
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+}
