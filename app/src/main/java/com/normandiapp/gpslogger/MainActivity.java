@@ -112,10 +112,10 @@ public class MainActivity extends AppCompatActivity {
         button.setText(R.string.stop_logging);
 
         // MODIFIÉ : Création de la LocationRequest et du LocationCallback
-        LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, UPDATE_INTERVAL)
-                .setWaitForAccurateLocation(true)
-                .setMinUpdateDistanceMeters(MINIMUM_DISTANCE)
-                .build();
+        LocationRequest locationRequest = new LocationRequest.Builder(UPDATE_INTERVAL)
+        .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
+        .setMinUpdateDistanceMeters(MINIMUM_DISTANCE)
+        .build();
 
         locationCallback = new LocationCallback() {
             @Override
