@@ -16,7 +16,6 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import android.widget.Toast;
@@ -105,6 +104,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // --- CORRECTION 1: Rétablissement du "callback" de la demande de permission ---
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -134,7 +134,9 @@ public class MainActivity extends AppCompatActivity {
                 stream.write(kmlContent.getBytes());
                 stream.close();
 
-                Uri contentUri = FileProvider.getUriForFile(mContext, "com.normandiapp.gpslogger.provider", file);
+                // --- CORRECTION 2: Construction dynamique de l'autorité pour FileProvider ---
+                String authority = mContext.getPackageName() + ".provider";
+                Uri contentUri = FileProvider.getUriForFile(mContext, authority, file);
 
                 if (contentUri != null) {
                     Intent shareIntent = new Intent();
@@ -149,7 +151,7 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(() -> Toast.makeText(mContext, "Error al guardar el archivo KML.", Toast.LENGTH_SHORT).show());
             } catch (IllegalArgumentException e) {
                 e.printStackTrace();
-                runOnUiThread(() -> Toast.makeText(mContext, "Error de configuración del FileProvider.", Toast.LENGTH_LONG).show());
+                runOnUiThread(() -> Toast.makeText(mContext, "Error interna.", Toast.LENGTH_LONG).show());
             }
         }
     }
