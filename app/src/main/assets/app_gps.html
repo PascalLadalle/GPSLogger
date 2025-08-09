@@ -28,6 +28,7 @@
         #export-share { width: 100%; padding: 15px; background-color: #28a745; color: white; border: none; cursor: pointer; font-size: 16px; }
         #item-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
         #item-list li { padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        #item-list .item-color-indicator { width: 15px; height: 15px; border-radius: 50%; margin-right: 10px; flex-shrink: 0; }
         #item-list .item-name { flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 10px; }
         #item-list .item-name[contenteditable="true"] { background-color: #f0f8ff; box-shadow: inset 0 0 2px #007bff; outline: none; padding: 2px 5px; }
         #item-list .item-actions { display: flex; gap: 8px; }
@@ -38,15 +39,7 @@
         #menu-footer { padding: 20px; border-top: 1px solid #ddd; background-color: #f8f9fa; }
         #delete-all { width: 100%; padding: 15px; background-color: #dc3545; color: white; border: none; cursor: pointer; font-size: 16px; margin-top: 15px; }
         .direction-marker-container { }
-        .direction-arrow {
-            width: 0; height: 0;
-            border-left: 10px solid transparent;
-            border-right: 10px solid transparent;
-            border-bottom: 25px solid #007BFF;
-            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
-            transition: transform 0.2s linear;
-            transform-origin: center 18px;
-        }
+        .direction-arrow { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 25px solid #007BFF; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4)); transition: transform 0.2s linear; transform-origin: center 18px; }
         .direction-accuracy { background-color: rgba(0, 123, 255, 0.1); border-radius: 50%; border: 1px solid #007BFF; }
         .toggle-container { display: flex; align-items: center; justify-content: space-around; font-size: 14px;}
         .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
@@ -55,13 +48,36 @@
         .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: #2196F3; }
         input:checked + .slider:before { transform: translateX(26px); }
+        
+        /* Styles for Group Selector */
+        #group-selector-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; display: none; align-items: center; justify-content: center; }
+        #group-selector-modal.visible { display: flex; }
+        #group-selector-content { background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; text-align: center; }
+        #group-selector-content h3 { margin-top: 0; }
+        #group-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+        #group-list button { padding: 15px 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px; cursor: pointer; transition: transform 0.2s; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+        #group-list button:hover { transform: scale(1.05); }
+
+        /* Custom color marker */
+        .color-marker-icon { border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+
     </style>
 </head>
 <body>
     <div id="notification-container"></div>
     <div id="map"></div>
     <div id="map-overlay"></div>
-    <div id="controls"><button id="toggle-record">Iniciar Grabación</button><button id="add-point">Crear Punto</button></div>
+    <div id="group-selector-modal">
+        <div id="group-selector-content">
+            <h3>Seleccione un Grupo</h3>
+            <ul id="group-list"></ul>
+        </div>
+    </div>
+    <div id="controls">
+        <button id="toggle-record">Iniciar Grabación</button>
+        <button id="add-point">Crear Punto</button>
+        <button id="change-group-btn" style="display: none; background-color: #ffc107; color: black;">Cambiar Grupo</button>
+    </div>
     <button id="menu-toggle">☰</button>
     <div id="menu">
         <div id="menu-header"><h3>Mis Trazados</h3><button id="menu-close">&times;</button></div>
@@ -89,6 +105,20 @@
             let currentTrack;
             let recordedItems = [], itemIdCounter = 0;
             const minDistanceBetweenPoints = 2;
+            let currentPointGroup = null;
+
+            const GROUPS = [
+                { hex: '#46F0F0', name: 'Agua', comment: '' }, { hex: '#000000', name: 'Tuberias', comment: '' },
+                { hex: '#9A6324', name: 'Madera', comment: '' }, { hex: '#D35400', name: 'Naranjas', comment: '' },
+                { hex: '#F28500', name: 'Mandarinas', comment: '' }, { hex: '#BCF60C', name: 'Limon', comment: '' },
+                { hex: '#E6194B', name: 'Mango', comment: '' }, { hex: '#FFE119', name: 'Cambur|Platano', comment: '' },
+                { hex: '#3CB44B', name: 'Potrero', comment: '' }, { hex: '#FFFAC8', name: 'Guanabana', comment: '' },
+                { hex: '#800000', name: 'Cacao', comment: '' }, { hex: '#008080', name: 'Construccion', comment: '' },
+                { hex: '#FABEBE', name: 'Camino', comment: '' }, { hex: '#006400', name: 'Arbol', comment: '' },
+                { hex: '#654321', name: 'Guama', comment: '' }, { hex: '#911EB4', name: 'Otra mata', comment: '' },
+                { hex: '#A9A9A9', name: 'Otro', comment: '' }
+            ];
+            const DEFAULT_GROUP = GROUPS[GROUPS.length - 1];
 
             const imageBounds = [[8.468908, -71.669649], [8.480803, -71.657762]];
             let onlineTileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
@@ -99,6 +129,7 @@
             const mapToggle = document.getElementById('map-toggle');
             const toggleRecordBtn = document.getElementById('toggle-record');
             const addPointBtn = document.getElementById('add-point');
+            const changeGroupBtn = document.getElementById('change-group-btn');
             const menuToggleBtn = document.getElementById('menu-toggle');
             const menu = document.getElementById('menu');
             const menuCloseBtn = document.getElementById('menu-close');
@@ -107,12 +138,49 @@
             const exportShareBtn = document.getElementById('export-share');
             const deleteAllBtn = document.getElementById('delete-all');
             const notificationContainer = document.getElementById('notification-container');
+            const groupSelectorModal = document.getElementById('group-selector-modal');
+            const groupList = document.getElementById('group-list');
 
             delete L.Icon.Default.prototype._getIconUrl;
             L.Icon.Default.mergeOptions({
                 iconUrl: './images/marker-icon.png',
                 iconRetinaUrl: './images/marker-icon-2x.png',
                 shadowUrl: './images/marker-shadow.png'
+            });
+
+            // --- GROUP SELECTOR LOGIC ---
+            function showGroupSelector(callback) {
+                groupList.innerHTML = '';
+                GROUPS.forEach(group => {
+                    const li = document.createElement('li');
+                    const button = document.createElement('button');
+                    button.textContent = group.name;
+                    button.style.backgroundColor = group.hex;
+                    // Adjust text color for better contrast on dark backgrounds
+                    const bgColor = group.hex.substring(1);
+                    const r = parseInt(bgColor.substr(0, 2), 16);
+                    const g = parseInt(bgColor.substr(2, 2), 16);
+                    const b = parseInt(bgColor.substr(4, 2), 16);
+                    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                    if (luminance < 0.5) {
+                        button.style.color = 'white';
+                    } else {
+                        button.style.color = 'black';
+                    }
+                    
+                    button.addEventListener('click', () => {
+                        groupSelectorModal.classList.remove('visible');
+                        callback(group);
+                    });
+                    li.appendChild(button);
+                    groupList.appendChild(li);
+                });
+                groupSelectorModal.classList.add('visible');
+            }
+            groupSelectorModal.addEventListener('click', function(e) {
+                if(e.target === groupSelectorModal) {
+                    groupSelectorModal.classList.remove('visible');
+                }
             });
 
             window.updatePositionFromNative = function(lat, lng, accuracy) {
@@ -164,19 +232,26 @@
             mapToggle.addEventListener('change', function() { setMapMode(this.checked); });
             
             toggleRecordBtn.addEventListener('click', function() {
-                isRecording = !isRecording;
-                this.textContent = isRecording ? 'Detener Grabación' : 'Iniciar Grabación';
-                this.style.backgroundColor = isRecording ? '#dc3545' : '#007BFF';
-
-                if (isRecording) {
-                    startNewTrack();
-                    if (userPositionMarker) {
-                        map.flyTo(userPositionMarker.getLatLng(), 18);
-                        showNotification('Grabación iniciada.');
-                    } else {
-                        showNotification('Grabación iniciada. Esperando señal GPS...');
-                    }
+                if (!isRecording) {
+                    // Start recording: first, select a group
+                    showGroupSelector(group => {
+                        isRecording = true;
+                        toggleRecordBtn.textContent = 'Detener Grabación';
+                        toggleRecordBtn.style.backgroundColor = '#dc3545';
+                        startNewTrack(group);
+                        if (userPositionMarker) {
+                            map.flyTo(userPositionMarker.getLatLng(), 18);
+                            showNotification(`Grabación iniciada para grupo '${group.name}'.`);
+                        } else {
+                            showNotification(`Grabación iniciada. Esperando señal GPS...`);
+                        }
+                    });
                 } else {
+                    // Stop recording
+                    isRecording = false;
+                    toggleRecordBtn.textContent = 'Iniciar Grabación';
+                    toggleRecordBtn.style.backgroundColor = '#007BFF';
+
                     const trackToFinalize = currentTrack;
                     currentTrack = null;
 
@@ -189,8 +264,11 @@
                         if (isClosedLoop) {
                             points.push(firstPoint);
                             const simplifiedPolygonPoints = intelligentSimplify(points);
-                            const polygon = L.polygon(simplifiedPolygonPoints, {color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2}).addTo(map);
+                            
                             const oldTrackItem = recordedItems.find(item => item.layer === trackToFinalize);
+                            const polygonColor = oldTrackItem ? oldTrackItem.group.hex : 'red';
+                            
+                            const polygon = L.polygon(simplifiedPolygonPoints, {color: polygonColor, weight: 2, fillColor: polygonColor, fillOpacity: 0.2}).addTo(map);
                             if(oldTrackItem) oldTrackItem.layer = polygon;
                             map.removeLayer(trackToFinalize);
                             showNotification('Polígono creado y simplificado.');
@@ -223,21 +301,122 @@
                 return points;
             }
 
-            function startNewTrack() { const id = `track-${++itemIdCounter}`; const trackName = `Recorrido ${itemIdCounter}`; currentTrack = L.polyline([], { color: 'red', weight: 4 }).addTo(map); recordedItems.push({ id, name: trackName, type: 'track', layer: currentTrack }); updateItemList(); }
-            addPointBtn.addEventListener('click', function() { if (!userPositionMarker) return showNotification('Posición no encontrada.', 'error'); map.flyTo(userPositionMarker.getLatLng(), 18); const id = `point-${++itemIdCounter}`; const pointName = `Punto ${itemIdCounter}`; const latlng = userPositionMarker.getLatLng(); const point = L.marker(latlng).addTo(map).bindPopup(pointName); recordedItems.push({ id, name: pointName, type: 'point', layer: point }); updateItemList(); saveData(); showNotification(`Nuevo punto creado: ${pointName}`); });
+            function startNewTrack(group) { 
+                const id = `track-${++itemIdCounter}`; 
+                const trackName = `${group.name} ${itemIdCounter}`; 
+                currentTrack = L.polyline([], { color: group.hex, weight: 4 }).addTo(map); 
+                recordedItems.push({ id, name: trackName, type: 'track', layer: currentTrack, group: group }); 
+                updateItemList(); 
+            }
+
+            function createPoint(group) {
+                if (!userPositionMarker) return showNotification('Posición no encontrada.', 'error');
+                map.flyTo(userPositionMarker.getLatLng(), 18);
+                const id = `point-${++itemIdCounter}`;
+                const pointName = `${group.name} ${itemIdCounter}`;
+                const latlng = userPositionMarker.getLatLng();
+                
+                const colorIcon = L.divIcon({
+                    className: 'color-marker-icon',
+                    html: `<div style="background-color: ${group.hex}; width: 20px; height: 20px; border-radius: 50%;"></div>`,
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                });
+
+                const point = L.marker(latlng, {icon: colorIcon}).addTo(map).bindPopup(pointName);
+                recordedItems.push({ id, name: pointName, type: 'point', layer: point, group: group });
+                updateItemList();
+                saveData();
+                showNotification(`Punto '${pointName}' creado.`);
+            }
+
+            addPointBtn.addEventListener('click', function() {
+                if (currentPointGroup) {
+                    createPoint(currentPointGroup);
+                } else {
+                    showGroupSelector(group => {
+                        currentPointGroup = group;
+                        changeGroupBtn.style.display = 'inline-block';
+                        changeGroupBtn.style.backgroundColor = group.hex;
+                        createPoint(group);
+                    });
+                }
+            });
+
+            changeGroupBtn.addEventListener('click', function() {
+                showGroupSelector(group => {
+                    currentPointGroup = group;
+                    changeGroupBtn.style.backgroundColor = group.hex;
+                    showNotification(`Grupo activo cambiado a: ${group.name}`);
+                });
+            });
 
             deleteAllBtn.addEventListener('click', function() {
                 if (recordedItems.length === 0) return showNotification('No hay nada que borrar.', 'error');
                 recordedItems.forEach(item => { if (item.layer && map.hasLayer(item.layer)) map.removeLayer(item.layer); });
                 recordedItems = []; itemIdCounter = 0;
+                currentPointGroup = null;
+                changeGroupBtn.style.display = 'none';
                 updateItemList(); saveData();
                 showNotification('Todos los elementos han sido borrados.');
             });
             
-            function saveData() { const savableItems = recordedItems.map(item => { const data = { id: item.id, name: item.name, type: item.type, coords: null }; if (item.type === 'point' && item.layer && typeof item.layer.getLatLng === 'function') { data.coords = item.layer.getLatLng(); } else if (item.type === 'track' && item.layer && typeof item.layer.getLatLngs === 'function') { data.coords = item.layer.getLatLngs(); } return data; }); localStorage.setItem('geoTrackerData', JSON.stringify(savableItems)); }
-            function loadData() { const savedData = localStorage.getItem('geoTrackerData'); if (!savedData) return; try { const parsedItems = JSON.parse(savedData); let maxId = 0; parsedItems.forEach(savedItem => { let layer = null; if (!savedItem.coords) return; if (savedItem.type === 'point' && savedItem.coords.lat != null && savedItem.coords.lng != null) { layer = L.marker(savedItem.coords).addTo(map).bindPopup(savedItem.name); } else if (savedItem.type === 'track' && Array.isArray(savedItem.coords)) { const points = savedItem.coords.map(c => L.latLng(c.lat, c.lng)); if (points.length === 0) return; if (points.length > 2 && points[0].equals(points[points.length - 1])) { layer = L.polygon(points, { color: 'red', weight: 2, fillColor: 'red', fillOpacity: 0.2 }).addTo(map); } else { layer = L.polyline(points, { color: 'red', weight: 4 }).addTo(map); } } if (layer) { recordedItems.push({ id: savedItem.id, name: savedItem.name, type: savedItem.type, layer: layer }); const idNum = parseInt(savedItem.id.split('-')[1]); if (idNum > maxId) maxId = idNum; } }); itemIdCounter = maxId; updateItemList(); } catch (e) { console.error("Error al cargar los datos locales:", e); localStorage.removeItem('geoTrackerData'); } }
+            function saveData() { 
+                const savableItems = recordedItems.map(item => { 
+                    const data = { id: item.id, name: item.name, type: item.type, coords: null, groupHex: item.group.hex }; 
+                    if (item.type === 'point' && item.layer && typeof item.layer.getLatLng === 'function') { 
+                        data.coords = item.layer.getLatLng(); 
+                    } else if (item.type === 'track' && item.layer && typeof item.layer.getLatLngs === 'function') { 
+                        data.coords = item.layer.getLatLngs(); 
+                    } 
+                    return data; 
+                }); 
+                localStorage.setItem('geoTrackerData', JSON.stringify(savableItems)); 
+            }
+
+            function loadData() {
+                const savedData = localStorage.getItem('geoTrackerData');
+                if (!savedData) return;
+                try {
+                    const parsedItems = JSON.parse(savedData);
+                    let maxId = 0;
+                    parsedItems.forEach(savedItem => {
+                        let layer = null;
+                        if (!savedItem.coords) return;
+                        
+                        const group = GROUPS.find(g => g.hex === savedItem.groupHex) || DEFAULT_GROUP;
+
+                        if (savedItem.type === 'point' && savedItem.coords.lat != null && savedItem.coords.lng != null) {
+                             const colorIcon = L.divIcon({
+                                className: 'color-marker-icon',
+                                html: `<div style="background-color: ${group.hex}; width: 20px; height: 20px; border-radius: 50%;"></div>`,
+                                iconSize: [20, 20], iconAnchor: [10, 10]
+                            });
+                            layer = L.marker(savedItem.coords, {icon: colorIcon}).addTo(map).bindPopup(savedItem.name);
+                        } else if (savedItem.type === 'track' && Array.isArray(savedItem.coords)) {
+                            const points = savedItem.coords.map(c => L.latLng(c.lat, c.lng));
+                            if (points.length === 0) return;
+                            if (points.length > 2 && points[0].equals(points[points.length - 1])) {
+                                layer = L.polygon(points, { color: group.hex, weight: 2, fillColor: group.hex, fillOpacity: 0.2 }).addTo(map);
+                            } else {
+                                layer = L.polyline(points, { color: group.hex, weight: 4 }).addTo(map);
+                            }
+                        }
+                        if (layer) {
+                            recordedItems.push({ id: savedItem.id, name: savedItem.name, type: savedItem.type, layer: layer, group: group });
+                            const idNum = parseInt(savedItem.id.split('-')[1]);
+                            if (idNum > maxId) maxId = idNum;
+                        }
+                    });
+                    itemIdCounter = maxId;
+                    updateItemList();
+                } catch (e) {
+                    console.error("Error al cargar los datos locales:", e);
+                    localStorage.removeItem('geoTrackerData');
+                }
+            }
             function showNotification(message, type = 'success') { const notif = document.createElement('div'); notif.className = `toast-notification ${type}`; notif.textContent = message; notificationContainer.appendChild(notif); requestAnimationFrame(() => notif.classList.add('show')); setTimeout(() => { notif.classList.remove('show'); notif.addEventListener('transitionend', () => notif.remove(), { once: true }); }, 3500); }
-            function updateItemList() { itemList.innerHTML = ''; recordedItems.forEach(item => { const li = document.createElement('li'); li.dataset.itemId = item.id; const nameSpan = document.createElement('span'); nameSpan.className = 'item-name'; nameSpan.textContent = item.name; const actionsDiv = document.createElement('div'); actionsDiv.className = 'item-actions'; const renameBtn = document.createElement('button'); renameBtn.innerHTML = '✏️'; renameBtn.className = 'rename-btn'; renameBtn.title = 'Renombrar'; const deleteBtn = document.createElement('button'); deleteBtn.innerHTML = '🗑️'; deleteBtn.className = 'delete-btn'; deleteBtn.title = 'Borrar'; actionsDiv.appendChild(renameBtn); actionsDiv.appendChild(deleteBtn); li.appendChild(nameSpan); li.appendChild(actionsDiv); itemList.appendChild(li); }); }
+            function updateItemList() { itemList.innerHTML = ''; recordedItems.forEach(item => { const li = document.createElement('li'); li.dataset.itemId = item.id; const colorIndicator = document.createElement('div'); colorIndicator.className = 'item-color-indicator'; colorIndicator.style.backgroundColor = item.group.hex; const nameSpan = document.createElement('span'); nameSpan.className = 'item-name'; nameSpan.textContent = item.name; const actionsDiv = document.createElement('div'); actionsDiv.className = 'item-actions'; const renameBtn = document.createElement('button'); renameBtn.innerHTML = '✏️'; renameBtn.className = 'rename-btn'; renameBtn.title = 'Renombrar'; const deleteBtn = document.createElement('button'); deleteBtn.innerHTML = '🗑️'; deleteBtn.className = 'delete-btn'; deleteBtn.title = 'Borrar'; actionsDiv.appendChild(renameBtn); actionsDiv.appendChild(deleteBtn); li.appendChild(colorIndicator); li.appendChild(nameSpan); li.appendChild(actionsDiv); itemList.appendChild(li); }); }
             
             itemList.addEventListener('click', function(e) { const button = e.target.closest('button'); if (!button) return; const li = e.target.closest('li'); const itemId = li.dataset.itemId; const item = recordedItems.find(i => i.id === itemId); if (!item) return; const nameSpan = li.querySelector('.item-name'); if (button.classList.contains('delete-btn')) { map.removeLayer(item.layer); recordedItems = recordedItems.filter(i => i.id !== item.id); updateItemList(); saveData(); showNotification(`'${item.name}' ha sido borrado.`); } else if (button.classList.contains('rename-btn')) { nameSpan.contentEditable = true; nameSpan.focus(); button.innerHTML = '💾'; button.classList.remove('rename-btn'); button.classList.add('save-btn'); button.title = 'Guardar'; } else if (button.classList.contains('save-btn')) { const newName = nameSpan.textContent.trim(); if (newName) { item.name = newName; if (item.layer.getPopup()) { item.layer.setPopupContent(item.name); } else { item.layer.bindPopup(item.name); } saveData(); showNotification('Elemento renombrado.'); } nameSpan.contentEditable = false; button.innerHTML = '✏️'; button.classList.remove('save-btn'); button.classList.add('rename-btn'); button.title = 'Renombrar'; } });
             
@@ -258,17 +437,19 @@
                     showNotification('Función de compartir no disponible.', 'error');
                 }
             });
-
+            
             function generateKML() {
                 let kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n    <name>Datos del mapa interactivo</name>\n    <description>Exportado desde la aplicación web</description>\n`;
                 recordedItems.forEach(item => {
                     const safeName = item.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const group = item.group || DEFAULT_GROUP; // Récupère le groupe de l'élément
+
                     kml += `      <Placemark>\n`;
                     kml += `        <name>${safeName}</name>\n`;
                     kml += `        <ExtendedData>\n`;
                     kml += `          <Data name="name"><value>${safeName}</value></Data>\n`;
-                    kml += `          <Data name="comment"><value></value></Data>\n`;
-                    kml += `          <Data name="color"><value>#A9A9A9</value></Data>\n`;
+                    kml += `          <Data name="comment"><value>${group.comment || ''}</value></Data>\n`;
+                    kml += `          <Data name="color"><value>${group.hex}</value></Data>\n`;
                     kml += `        </ExtendedData>\n`;
                     if (item.type === 'point') {
                         const coords = item.layer.getLatLng();
