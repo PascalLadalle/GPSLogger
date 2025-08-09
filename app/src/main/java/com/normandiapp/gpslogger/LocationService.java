@@ -3,78 +3,109 @@ package com.normandiapp.gpslogger;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
-import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
 import android.os.Build;
-import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Looper;
+import android.util.Log;
+
 import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.Priority;
+
 public class LocationService extends Service {
 
+    private static final String TAG = "LocationService";
+    
+    // Constantes originales para la notificación
     private static final int NOTIFICATION_ID = 1;
     private static final String NOTIFICATION_CHANNEL_ID = "LocationServiceChannel";
 
+    // Constantes de comunicación con MainActivity (sin cambios)
     public static final String ACTION_LOCATION_BROADCAST = "LocationBroadcast";
     public static final String EXTRA_LATITUDE = "latitude";
     public static final String EXTRA_LONGITUDE = "longitude";
     public static final String EXTRA_ACCURACY = "accuracy";
     public static final String EXTRA_HEADING = "heading";
 
-
-    private LocationManager locationManager;
-    private LocationListener locationListener;
+    // Componentes de FusedLocationProvider
+    private FusedLocationProviderClient fusedLocationClient;
+    private LocationCallback locationCallback;
+    private LocationRequest locationRequest;
 
     @Override
     public void onCreate() {
         super.onCreate();
-        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        locationListener = new LocationListener() {
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+
+        locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000)
+                .setMinUpdateIntervalMillis(2000)
+                .build();
+        
+        locationCallback = new LocationCallback() {
             @Override
-            public void onLocationChanged(Location location) {
-                sendLocationBroadcast(location);
+            public void onLocationResult(LocationResult locationResult) {
+                if (locationResult == null) {
+                    return;
+                }
+                for (Location location : locationResult.getLocations()) {
+                    if (location != null) {
+                        Log.d(TAG, "Nueva posición: Lat " + location.getLatitude() + ", Lon " + location.getLongitude());
+                        sendLocationBroadcast(location);
+                    }
+                }
             }
-            @Override
-            public void onStatusChanged(String provider, int status, Bundle extras) {}
-            @Override
-            public void onProviderEnabled(String provider) {}
-            @Override
-            public void onProviderDisabled(String provider) {}
         };
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         createNotificationChannel();
+        
+        Intent notificationIntent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
+
+        // *** CAMBIO: Usando los textos en español del código original ***
         Notification notification = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
                 .setContentTitle("GPSLogger")
                 .setContentText("Servicio de GPS activo")
                 .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .build();
 
         startForeground(NOTIFICATION_ID, notification);
-
-        try {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 1, locationListener);
-        } catch (SecurityException e) {
-            e.printStackTrace();
-            stopSelf();
-        }
+        startLocationUpdates();
 
         return START_STICKY;
+    }
+
+    private void startLocationUpdates() {
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Log.e(TAG, "Permiso de ubicación no concedido. Deteniendo servicio.");
+            stopSelf();
+            return;
+        }
+        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        locationManager.removeUpdates(locationListener);
+        fusedLocationClient.removeLocationUpdates(locationCallback);
+        Log.d(TAG, "Servicio detenido y actualizaciones de ubicación finalizadas.");
     }
 
     private void sendLocationBroadcast(Location location) {
@@ -92,6 +123,7 @@ public class LocationService extends Service {
 
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // *** CAMBIO: Usando el nombre del canal en español del código original ***
             NotificationChannel serviceChannel = new NotificationChannel(
                     NOTIFICATION_CHANNEL_ID,
                     "Canal de Servicio de Ubicación",
@@ -100,13 +132,4 @@ public class LocationService extends Service {
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) {
                 manager.createNotificationChannel(serviceChannel);
-            }
-        }
-    }
-
-    @Nullable
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
-}
+        
