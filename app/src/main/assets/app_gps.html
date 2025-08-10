@@ -54,7 +54,10 @@
         #group-selector-modal.visible { display: flex; }
         #group-selector-content { background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; text-align: center; }
         #group-selector-content h3 { margin-top: 0; }
-        #group-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+        #group-list { list-style: none; padding: 0; margin: 0; }
+        #group-list h4 { margin-top: 15px; margin-bottom: 10px; text-align: left; padding-bottom: 5px; border-bottom: 1px solid #eee; color: #333; }
+        #group-list h4:first-child { margin-top: 0; }
+        .group-button-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
         #group-list button { padding: 15px 10px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px; cursor: pointer; transition: transform 0.2s; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
         #group-list button:hover { transform: scale(1.05); }
 
@@ -76,7 +79,7 @@
     <div id="controls">
         <button id="toggle-record">Iniciar Grabación</button>
         <button id="add-point">Crear Punto</button>
-        <button id="change-group-btn" style="display: none; background-color: #ffc107; color: black;">Cambiar Grupo</button>
+        <button id="change-group-btn" style="display: none;"></button>
     </div>
     <button id="menu-toggle">☰</button>
     <div id="menu">
@@ -118,6 +121,22 @@
                 { hex: '#654321', name: 'Guama', comment: '' }, { hex: '#911EB4', name: 'Otra mata', comment: '' },
                 { hex: '#A9A9A9', name: 'Otro', comment: '' }
             ];
+
+            const GROUP_STRUCTURE = [
+                {
+                    title: "Frutas",
+                    names: ['Cambur|Platano', 'Naranjas', 'Mandarinas', 'Limon', 'Mango', 'Guanabana', 'Cacao', 'Guama']
+                },
+                {
+                    title: "Vegetación",
+                    names: ['Potrero', 'Arbol', 'Madera', 'Otra mata']
+                },
+                {
+                    title: "Infraestructura y Otros",
+                    names: ['Camino', 'Agua', 'Construccion', 'Tuberias', 'Otro']
+                }
+            ];
+
             const DEFAULT_GROUP = GROUPS[GROUPS.length - 1];
 
             const imageBounds = [[8.468908, -71.669649], [8.480803, -71.657762]];
@@ -151,29 +170,36 @@
             // --- GROUP SELECTOR LOGIC ---
             function showGroupSelector(callback) {
                 groupList.innerHTML = '';
-                GROUPS.forEach(group => {
-                    const li = document.createElement('li');
-                    const button = document.createElement('button');
-                    button.textContent = group.name;
-                    button.style.backgroundColor = group.hex;
-                    // Adjust text color for better contrast on dark backgrounds
-                    const bgColor = group.hex.substring(1);
-                    const r = parseInt(bgColor.substr(0, 2), 16);
-                    const g = parseInt(bgColor.substr(2, 2), 16);
-                    const b = parseInt(bgColor.substr(4, 2), 16);
-                    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-                    if (luminance < 0.5) {
-                        button.style.color = 'white';
-                    } else {
-                        button.style.color = 'black';
-                    }
-                    
-                    button.addEventListener('click', () => {
-                        groupSelectorModal.classList.remove('visible');
-                        callback(group);
+                GROUP_STRUCTURE.forEach(groupCategory => {
+                    const header = document.createElement('h4');
+                    header.textContent = groupCategory.title;
+                    groupList.appendChild(header);
+
+                    const buttonContainer = document.createElement('div');
+                    buttonContainer.className = 'group-button-container';
+
+                    groupCategory.names.forEach(name => {
+                        const group = GROUPS.find(g => g.name === name);
+                        if (!group) return;
+
+                        const button = document.createElement('button');
+                        button.textContent = group.name;
+                        button.style.backgroundColor = group.hex;
+                        
+                        const bgColor = group.hex.substring(1);
+                        const r = parseInt(bgColor.substr(0, 2), 16);
+                        const g = parseInt(bgColor.substr(2, 2), 16);
+                        const b = parseInt(bgColor.substr(4, 2), 16);
+                        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                        button.style.color = (luminance < 0.5) ? 'white' : 'black';
+                        
+                        button.addEventListener('click', () => {
+                            groupSelectorModal.classList.remove('visible');
+                            callback(group);
+                        });
+                        buttonContainer.appendChild(button);
                     });
-                    li.appendChild(button);
-                    groupList.appendChild(li);
+                    groupList.appendChild(buttonContainer);
                 });
                 groupSelectorModal.classList.add('visible');
             }
@@ -233,7 +259,6 @@
             
             toggleRecordBtn.addEventListener('click', function() {
                 if (!isRecording) {
-                    // Start recording: first, select a group
                     showGroupSelector(group => {
                         isRecording = true;
                         toggleRecordBtn.textContent = 'Detener Grabación';
@@ -247,27 +272,21 @@
                         }
                     });
                 } else {
-                    // Stop recording
                     isRecording = false;
                     toggleRecordBtn.textContent = 'Iniciar Grabación';
                     toggleRecordBtn.style.backgroundColor = '#007BFF';
-
                     const trackToFinalize = currentTrack;
                     currentTrack = null;
-
                     if (trackToFinalize && trackToFinalize.getLatLngs().length > 2) {
                         let points = trackToFinalize.getLatLngs();
                         const firstPoint = points[0];
                         const lastPoint = points[points.length - 1];
                         const isClosedLoop = firstPoint.distanceTo(lastPoint) < 5;
-
                         if (isClosedLoop) {
                             points.push(firstPoint);
                             const simplifiedPolygonPoints = intelligentSimplify(points);
-                            
                             const oldTrackItem = recordedItems.find(item => item.layer === trackToFinalize);
                             const polygonColor = oldTrackItem ? oldTrackItem.group.hex : 'red';
-                            
                             const polygon = L.polygon(simplifiedPolygonPoints, {color: polygonColor, weight: 2, fillColor: polygonColor, fillOpacity: 0.2}).addTo(map);
                             if(oldTrackItem) oldTrackItem.layer = polygon;
                             map.removeLayer(trackToFinalize);
@@ -315,14 +334,11 @@
                 const id = `point-${++itemIdCounter}`;
                 const pointName = `${group.name} ${itemIdCounter}`;
                 const latlng = userPositionMarker.getLatLng();
-                
                 const colorIcon = L.divIcon({
                     className: 'color-marker-icon',
                     html: `<div style="background-color: ${group.hex}; width: 20px; height: 20px; border-radius: 50%;"></div>`,
-                    iconSize: [20, 20],
-                    iconAnchor: [10, 10]
+                    iconSize: [20, 20], iconAnchor: [10, 10]
                 });
-
                 const point = L.marker(latlng, {icon: colorIcon}).addTo(map).bindPopup(pointName);
                 recordedItems.push({ id, name: pointName, type: 'point', layer: point, group: group });
                 updateItemList();
@@ -330,14 +346,37 @@
                 showNotification(`Punto '${pointName}' creado.`);
             }
 
+            function setCurrentPointGroup(group) {
+                currentPointGroup = group;
+                changeGroupBtn.style.display = 'inline-block';
+                changeGroupBtn.textContent = 'Cambiar Grupo';
+
+                const bgColor = group.hex.substring(1);
+                const r = parseInt(bgColor.substr(0, 2), 16);
+                const g = parseInt(bgColor.substr(2, 2), 16);
+                const b = parseInt(bgColor.substr(4, 2), 16);
+                const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                const textColor = luminance < 0.5 ? 'white' : 'black';
+                
+                addPointBtn.style.backgroundColor = group.hex;
+                addPointBtn.style.color = textColor;
+                changeGroupBtn.style.backgroundColor = group.hex;
+                changeGroupBtn.style.color = textColor;
+            }
+
+            function resetPointGroupState() {
+                currentPointGroup = null;
+                changeGroupBtn.style.display = 'none';
+                addPointBtn.style.backgroundColor = '#007BFF';
+                addPointBtn.style.color = 'white';
+            }
+
             addPointBtn.addEventListener('click', function() {
                 if (currentPointGroup) {
                     createPoint(currentPointGroup);
                 } else {
                     showGroupSelector(group => {
-                        currentPointGroup = group;
-                        changeGroupBtn.style.display = 'inline-block';
-                        changeGroupBtn.style.backgroundColor = group.hex;
+                        setCurrentPointGroup(group);
                         createPoint(group);
                     });
                 }
@@ -345,8 +384,7 @@
 
             changeGroupBtn.addEventListener('click', function() {
                 showGroupSelector(group => {
-                    currentPointGroup = group;
-                    changeGroupBtn.style.backgroundColor = group.hex;
+                    setCurrentPointGroup(group);
                     showNotification(`Grupo activo cambiado a: ${group.name}`);
                 });
             });
@@ -355,8 +393,9 @@
                 if (recordedItems.length === 0) return showNotification('No hay nada que borrar.', 'error');
                 recordedItems.forEach(item => { if (item.layer && map.hasLayer(item.layer)) map.removeLayer(item.layer); });
                 recordedItems = []; itemIdCounter = 0;
-                currentPointGroup = null;
-                changeGroupBtn.style.display = 'none';
+                
+                resetPointGroupState();
+
                 updateItemList(); saveData();
                 showNotification('Todos los elementos han sido borrados.');
             });
@@ -383,9 +422,7 @@
                     parsedItems.forEach(savedItem => {
                         let layer = null;
                         if (!savedItem.coords) return;
-                        
                         const group = GROUPS.find(g => g.hex === savedItem.groupHex) || DEFAULT_GROUP;
-
                         if (savedItem.type === 'point' && savedItem.coords.lat != null && savedItem.coords.lng != null) {
                              const colorIcon = L.divIcon({
                                 className: 'color-marker-icon',
@@ -437,13 +474,12 @@
                     showNotification('Función de compartir no disponible.', 'error');
                 }
             });
-            
+
             function generateKML() {
                 let kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n    <name>Datos del mapa interactivo</name>\n    <description>Exportado desde la aplicación web</description>\n`;
                 recordedItems.forEach(item => {
                     const safeName = item.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    const group = item.group || DEFAULT_GROUP; // Récupère le groupe de l'élément
-
+                    const group = item.group || DEFAULT_GROUP;
                     kml += `      <Placemark>\n`;
                     kml += `        <name>${safeName}</name>\n`;
                     kml += `        <ExtendedData>\n`;
