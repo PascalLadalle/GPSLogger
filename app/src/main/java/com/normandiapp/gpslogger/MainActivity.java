@@ -19,6 +19,8 @@ import android.os.Bundle;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import android.widget.Toast;
+import android.os.PowerManager;
+import android.provider.Settings;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -52,7 +54,30 @@ public class MainActivity extends AppCompatActivity {
         stopLocationService();
         super.onDestroy();
     }
+//demander a desactiver leconomisateur de batterie
+    private void checkAndRequestBatteryOptimizations() {
+    String packageName = getPackageName();
+    PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
 
+    // Vérifier si l'application est déjà sur la liste blanche
+    if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+        // L'application n'est pas optimisée, demander à l'utilisateur de la désactiver
+        Intent intent = new Intent();
+        intent.setAction(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+        intent.setData(Uri.parse("package:" + packageName));
+        
+        // Vérifier s'il y a une activité pour gérer cet intent
+        if (intent.resolveActivity(getPackageManager()) != null) {
+            startActivity(intent);
+        } else {
+            // Sur certains appareils, cette action peut ne pas exister.
+            // Informer l'utilisateur d'aller le faire manuellement.
+            Toast.makeText(this, "Por favor, desactive manualmente la optimización de batería para esta app en los ajustes del sistema.", Toast.LENGTH_LONG).show();
+        }
+    }
+}
+
+    
     private void setupReceiver() {
         locationReceiver = new BroadcastReceiver() {
             @Override
@@ -119,11 +144,13 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startLocationService();
+                checkAndRequestBatteryOptimizations(); 
             } else {
-                Toast.makeText(this, "La autorización de GPS es necesaria para el funcionamiento de la aplicación.", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "La autorización de GPS y notificaciones son necesarias para el funcionamiento de la aplicación.", Toast.LENGTH_LONG).show();
             }
         }
     }
+
     
     public class WebAppInterface {
         Context mContext;
