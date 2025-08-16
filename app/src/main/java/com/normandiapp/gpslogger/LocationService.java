@@ -51,9 +51,10 @@ public class LocationService extends Service {
         super.onCreate();
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
-        locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000)
-                .setMinUpdateIntervalMillis(2000)
-                .build();
+        locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000) // 5 secondes
+        .setMinUpdateIntervalMillis(2000) // 2 secondes
+        .setWaitForAccurateLocation(false) // Ne pas attendre indéfiniment une position parfaite
+        .build();
         
         locationCallback = new LocationCallback() {
             @Override
@@ -143,3 +144,4 @@ public class LocationService extends Service {
         return null;
     }
 }
+
