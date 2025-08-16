@@ -86,8 +86,6 @@ public class LocationService extends Service {
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
 
-        return START_STICKY;
-        // *** CAMBIO: Usando los textos en español del código original ***
         Notification notification = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
                 .setContentTitle("GPSLogger")
                 .setContentText("Servicio de GPS activo")
@@ -95,14 +93,15 @@ public class LocationService extends Service {
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .build();
-        
+
+        // Acquérir le WakeLock
         if (wakeLock != null && !wakeLock.isHeld()) {
             wakeLock.acquire();
             Log.d(TAG, "WakeLock acquis.");
         }
+
         startForeground(NOTIFICATION_ID, notification);
         startLocationUpdates();
-
         return START_STICKY;
     }
 
@@ -161,6 +160,7 @@ public class LocationService extends Service {
         return null;
     }
 }
+
 
 
 
