@@ -86,14 +86,6 @@ public class LocationService extends Service {
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
 
-        if (wakeLock != null && !wakeLock.isHeld()) {
-            wakeLock.acquire();
-            Log.d(TAG, "WakeLock acquis.");
-        }
-
-        startForeground(NOTIFICATION_ID, notification);
-        startLocationUpdates();
-
         return START_STICKY;
         // *** CAMBIO: Usando los textos en español del código original ***
         Notification notification = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
@@ -103,7 +95,11 @@ public class LocationService extends Service {
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .build();
-
+        
+        if (wakeLock != null && !wakeLock.isHeld()) {
+            wakeLock.acquire();
+            Log.d(TAG, "WakeLock acquis.");
+        }
         startForeground(NOTIFICATION_ID, notification);
         startLocationUpdates();
 
@@ -165,5 +161,6 @@ public class LocationService extends Service {
         return null;
     }
 }
+
 
 
