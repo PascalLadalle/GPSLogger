@@ -13,6 +13,7 @@ import android.os.Build;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
+import android.os.PowerManager; 
 
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
@@ -29,6 +30,7 @@ import com.google.android.gms.location.Priority;
 public class LocationService extends Service {
 
     private static final String TAG = "LocationService";
+    private PowerManager.WakeLock wakeLock; 
     
     // Constantes originales para la notificación
     private static final int NOTIFICATION_ID = 1;
@@ -55,6 +57,11 @@ public class LocationService extends Service {
         .setMinUpdateIntervalMillis(2000) // 2 secondes
         .setWaitForAccurateLocation(false) // Ne pas attendre indéfiniment une position parfaite
         .build();
+
+         // Initialiser le WakeLock
+        PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
+                "GPSLogger::LocationWakelockTag"); // Donnez-lui un nom unique
         
         locationCallback = new LocationCallback() {
             @Override
@@ -79,6 +86,15 @@ public class LocationService extends Service {
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
 
+        if (wakeLock != null && !wakeLock.isHeld()) {
+            wakeLock.acquire();
+            Log.d(TAG, "WakeLock acquis.");
+        }
+
+        startForeground(NOTIFICATION_ID, notification);
+        startLocationUpdates();
+
+        return START_STICKY;
         // *** CAMBIO: Usando los textos en español del código original ***
         Notification notification = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
                 .setContentTitle("GPSLogger")
@@ -108,6 +124,11 @@ public class LocationService extends Service {
         super.onDestroy();
         fusedLocationClient.removeLocationUpdates(locationCallback);
         Log.d(TAG, "Servicio detenido y actualizaciones de ubicación finalizadas.");
+
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
+            Log.d(TAG, "WakeLock relâché.");
+        }
     }
 
     private void sendLocationBroadcast(Location location) {
@@ -144,4 +165,5 @@ public class LocationService extends Service {
         return null;
     }
 }
+
 
